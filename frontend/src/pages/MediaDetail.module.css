@@ -3,12 +3,13 @@
 .info{ flex:1; min-width:0; }
 .titleRow{ display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
 .title{ font-size: 32px; font-weight: 900; }
-.meta{ margin-top: 6px; color: rgba(255,255,255,.7); display:flex; align-items:center; gap:10px; }
+.meta{ margin-top: 6px; color: rgba(255,255,255,.7); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .dot{ width:4px; height:4px; background: rgba(255,255,255,.35); border-radius: 99px; }
-.desc{ margin-top: 14px; color: rgba(255,255,255,.78); max-width: 820px; }
+.desc{ margin-top: 16px; color: rgba(255,255,255,.78); max-width: 820px; }
 .sectionTitle{ font-size: 22px; font-weight: 800; margin: 16px 0 10px; }
 .strip{ display:flex; gap:14px; overflow:auto; padding-bottom: 10px; }
-.starBlock{ text-align:right; }
+
+.starBlock{ text-align:right; min-width: 160px; }
 .starPick{ display:flex; gap:8px; justify-content:flex-end; margin-top: 8px; }
 .starPick button{
   background: transparent;
@@ -18,7 +19,67 @@
 }
 .on{ color: var(--accent); }
 .off{ color: rgba(255,255,255,.25); }
+
+.clearLink{
+  margin-top: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,.68);
+  cursor: pointer;
+}
+
+.controls{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  margin-top: 18px;
+  max-width: 720px;
+}
+
+.controlBlock{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.controlLabel{
+  font-size: 14px;
+  color: rgba(255,255,255,.7);
+}
+
+.select{
+  width: 100%;
+  max-width: 320px;
+  background: rgba(255,255,255,.10);
+  color: var(--text);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  padding: 11px 12px;
+  outline:none;
+}
+
+.select option{
+  color: #111;
+  background: #fff;
+}
+
+.collectionRow{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+.actionMsg{
+  margin-top: 8px;
+  color: rgba(255,255,255,.78);
+  font-size: 14px;
+}
+
 @media(max-width: 900px){
   .top{ flex-direction:column; }
   .cover :global(.img), .cover :global(.ph){ width: 220px; height: 300px; }
+  .titleRow{ flex-direction:column; }
+  .starBlock{ text-align:left; min-width: 0; }
+  .starPick{ justify-content:flex-start; }
 }

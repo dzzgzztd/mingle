@@ -210,6 +210,64 @@
   align-items:start;
 }
 
+.itemCard{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.itemLink{
+  color: inherit;
+  text-decoration:none;
+}
+
+.itemCoverWrap{
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255,255,255,.06);
+}
+
+.itemCover{
+  width:100%;
+  height:100%;
+  object-fit: contain;
+  object-position: center;
+  display:block;
+  background: rgba(255,255,255,.04);
+}
+
+.itemCoverPh{
+  width:100%;
+  height:100%;
+  background: radial-gradient(circle at 30% 30%, rgba(130,255,230,.55), rgba(255,90,220,.35), rgba(255,255,255,.06));
+}
+
+.itemTitle{
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.removeBtn{
+  background: transparent;
+  color: rgba(255,255,255,.78);
+  border:1px solid rgba(255,255,255,.14);
+  padding:8px 10px;
+  border-radius: 999px;
+  cursor:pointer;
+}
+
 .recs{
   display:flex;
   gap:14px;

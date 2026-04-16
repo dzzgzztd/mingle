@@ -17,9 +17,10 @@ export default function Search() {
     const [items, setItems] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const [online, setOnline] = useState<ExternalSearchItem[]>([]);
+    const [onlineAll, setOnlineAll] = useState<ExternalSearchItem[]>([]);
     const [onlineLoading, setOnlineLoading] = useState(false);
     const [onlineError, setOnlineError] = useState<string | null>(null);
+    const [loadedQuery, setLoadedQuery] = useState("");
 
     const title = useMemo(() => (q ? `Результаты: “${q}”` : "Поиск"), [q]);
 
@@ -32,6 +33,25 @@ export default function Search() {
         setItems(res.data);
     };
 
+    const loadOnlineMixed = async (query: string) => {
+        if (!query) return;
+        setOnlineLoading(true);
+        setOnlineError(null);
+
+        try {
+            const res = await externalSearch({ q: query });
+            setOnlineAll(res.data.items ?? []);
+            setLoadedQuery(query);
+        } catch (e: any) {
+            const msg = e?.response?.data?.error || e?.message || "Ошибка внешнего поиска";
+            setOnlineError(String(msg));
+            setOnlineAll([]);
+            setLoadedQuery(query);
+        } finally {
+            setOnlineLoading(false);
+        }
+    };
+
     useEffect(() => {
         (async () => {
             setLoading(true);
@@ -42,30 +62,22 @@ export default function Search() {
             }
         })();
 
-        setOnline([]);
-        setOnlineError(null);
+        if (!q) {
+            setOnlineAll([]);
+            setOnlineError(null);
+            setLoadedQuery("");
+            return;
+        }
+
+        if (loadedQuery !== q) {
+            loadOnlineMixed(q);
+        }
     }, [q, type]);
 
-    const doOnlineSearch = async () => {
-        if (!q) return;
-
-        setOnlineLoading(true);
-        setOnlineError(null);
-
-        try {
-            const res = await externalSearch({
-                q,
-                type: type || undefined,
-            });
-            setOnline(res.data.items ?? []);
-        } catch (e: any) {
-            const msg = e?.response?.data?.error || e?.message || "Ошибка внешнего поиска";
-            setOnlineError(String(msg));
-            setOnline([]);
-        } finally {
-            setOnlineLoading(false);
-        }
-    };
+    const online = useMemo(() => {
+        if (!type) return onlineAll;
+        return onlineAll.filter((x) => x.type === type);
+    }, [onlineAll, type]);
 
     const doImport = async (x: ExternalSearchItem) => {
         try {
@@ -92,14 +104,7 @@ export default function Search() {
 
             {!loading && q && items.length === 0 && (
                 <div className="small">
-                    ничего не найдено локально{" "}
-                    <button
-                        onClick={doOnlineSearch}
-                        disabled={onlineLoading}
-                        style={{ marginLeft: 8 }}
-                    >
-                        {onlineLoading ? "ищу в интернете..." : "искать в интернете"}
-                    </button>
+                    ничего не найдено локально {onlineLoading && "ищу в интернете..."}
                 </div>
             )}
 
@@ -107,30 +112,17 @@ export default function Search() {
                 <>
                     <div className="small" style={{ margin: "10px 0" }}>
                         локальные результаты: {items.length}
-                        <button
-                            onClick={doOnlineSearch}
-                            disabled={!q || onlineLoading}
-                            style={{ marginLeft: 10 }}
-                        >
-                            {onlineLoading ? "ищу в интернете..." : "искать в интернете"}
-                        </button>
                     </div>
 
                     <div className={styles.grid}>
                         {items.map((m) => (
                             <Link key={m.id} className={styles.row} to={`/media/${m.id}`}>
                                 <div className={styles.cover}>
-                                    <Cover
-                                        src={(m.imageURL ?? undefined) as string | undefined}
-                                        seed={String(m.id)}
-                                    />
+                                    <Cover src={(m.imageURL ?? undefined) as string | undefined} seed={String(m.id)} />
                                 </div>
-
                                 <div className={styles.info}>
                                     <div className={styles.name}>{m.title}</div>
-                                    <div className={styles.meta}>
-                                        {m.creator || "Автор/режиссёр/разработчик"}
-                                    </div>
+                                    <div className="small">{m.creator || "Автор/режиссёр/разработчик"}</div>
                                     <div className={styles.desc}>{m.description}</div>
                                 </div>
                             </Link>
@@ -149,29 +141,21 @@ export default function Search() {
 
                     <div className={styles.grid}>
                         {online.map((x) => (
-                            <div key={`${x.source}:${x.externalId}`} className={styles.row}>
+                            <div key={`${x.source}:${x.externalId}`} className={styles.row} style={{ alignItems: "center" }}>
                                 <div className={styles.cover}>
                                     <Cover
                                         src={(x.imageUrl ?? undefined) as string | undefined}
                                         seed={`${x.source}-${x.externalId}`}
                                     />
                                 </div>
-
                                 <div className={styles.info}>
                                     <div className={styles.name}>{x.title}</div>
-                                    <div className={styles.meta}>
+                                    <div className="small">
                                         {x.year ?? "—"} • {x.type} • {x.source}
-                                        {x.creator ? ` • ${x.creator}` : ""}
                                     </div>
-                                    {x.description && (
-                                        <div className={styles.desc}>{x.description}</div>
-                                    )}
+                                    {x.creator && <div className="small">{x.creator}</div>}
                                 </div>
-
-                                <button
-                                    className={styles.importBtn}
-                                    onClick={() => doImport(x)}
-                                >
+                                <button className="btn" onClick={() => doImport(x)} style={{ marginLeft: "auto" }}>
                                     Импорт
                                 </button>
                             </div>

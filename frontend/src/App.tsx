@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./layout/AppShell";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
+import ProfileEdit from "./pages/ProfileEdit";
 import Collections from "./pages/Collections";
 import CollectionDetail from "./pages/CollectionDetail";
 import MediaList from "./pages/MediaList";
@@ -32,6 +33,8 @@ export default function App() {
                 <Route path="search" element={<Search />} />
 
                 <Route path="profile" element={<Profile />} />
+                <Route path="profile/edit" element={<ProfileEdit />} />
+
                 <Route path="collections" element={<Collections />} />
                 <Route path="collections/:id" element={<CollectionDetail />} />
 

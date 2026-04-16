@@ -1,27 +1,77 @@
 import { useEffect, useMemo, useState } from "react";
-import { getActivity, getProfile, upsertActivity } from "../api/profile";
+import { deleteActivity, getActivity } from "../api/profile";
 import { getMediaById } from "../api/media";
 import type { MediaItem } from "../types/media";
 import Cover from "../components/Cover";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import styles from "./Profile.module.css";
 
-type ActivityItem = { mediaID?: number; media_id: number; rating?: number | null; status?: string };
+type ActivityItem = {
+    mediaID?: number;
+    media_id: number;
+    rating?: number | null;
+    status?: string;
+};
 
 const ALLOWED = new Set([
-    "viewed", "watching", "will_watch",
-    "read", "reading", "will_read",
-    "completed", "playing", "will_play",
+    "viewed", "will_watch",
+    "read", "will_read",
+    "completed", "will_play",
 ]);
 
+const STATUS_LABEL: Record<string, string> = {
+    viewed: "Посмотрел(а)",
+    will_watch: "Буду смотреть",
+    read: "Прочитал(а)",
+    will_read: "Буду читать",
+    completed: "Прошел(а)",
+    will_play: "Хочу пройти",
+};
+
+function statusOptionsForType(type?: string | null) {
+    switch (type) {
+        case "movie":
+        case "series":
+            return [
+                { value: "", label: "Все статусы" },
+                { value: "viewed", label: "Посмотрел(а)" },
+                { value: "will_watch", label: "Буду смотреть" },
+            ];
+        case "book":
+            return [
+                { value: "", label: "Все статусы" },
+                { value: "read", label: "Прочитал(а)" },
+                { value: "will_read", label: "Буду читать" },
+            ];
+        case "game":
+            return [
+                { value: "", label: "Все статусы" },
+                { value: "completed", label: "Прошел(а)" },
+                { value: "will_play", label: "Хочу пройти" },
+            ];
+        default:
+            return [
+                { value: "", label: "Все статусы" },
+                { value: "viewed", label: "Посмотрел(а)" },
+                { value: "will_watch", label: "Буду смотреть" },
+                { value: "read", label: "Прочитал(а)" },
+                { value: "will_read", label: "Буду читать" },
+                { value: "completed", label: "Прошел(а)" },
+                { value: "will_play", label: "Хочу пройти" },
+            ];
+    }
+}
+
 export default function Profile() {
-    const [name, setName] = useState("UserNickname");
     const [activity, setActivity] = useState<ActivityItem[]>([]);
     const [items, setItems] = useState<Record<number, MediaItem>>({});
     const [loading, setLoading] = useState(true);
 
     const [sp] = useSearchParams();
-    const filterType = sp.get("type"); // movie|series|book|game|null
+    const navigate = useNavigate();
+
+    const filterType = sp.get("type");
+    const filterStatus = sp.get("status") ?? "";
 
     useEffect(() => {
         let cancelled = false;
@@ -30,23 +80,16 @@ export default function Profile() {
             setLoading(true);
 
             try {
-                const prof = await getProfile();
-                if (!cancelled) setName(prof.data.name || "UserNickname");
-            } catch {
-                // ignore
-            }
-
-            try {
                 const aRes = await getActivity();
                 const act: ActivityItem[] = aRes.data ?? [];
                 if (cancelled) return;
 
-                const filtered = act.filter(a => a.status && ALLOWED.has(a.status));
+                const filtered = act.filter((a) => a.status && ALLOWED.has(a.status));
                 setActivity(filtered);
 
                 const ids = Array.from(
-                    new Set(filtered.map(a => (a.media_id ?? (a as any).mediaID)).filter(Boolean))
-                ).slice(0, 80); // не грузим бесконечно
+                    new Set(filtered.map((a) => a.media_id ?? (a as any).mediaID).filter(Boolean))
+                ).slice(0, 120);
 
                 const pairs = await Promise.all(
                     ids.map(async (id) => {
@@ -87,35 +130,50 @@ export default function Profile() {
             })
             .filter((x) => x.m)
             .filter((x) => !filterType || x.m!.type === filterType)
-            .slice(0, 50);
-    }, [activity, items, filterType]);
+            .filter((x) => !filterStatus || x.a.status === filterStatus)
+            .sort((x, y) => {
+                const aStatus = x.a.status || "";
+                const bStatus = y.a.status || "";
+                if (aStatus !== bStatus) return aStatus.localeCompare(bStatus);
+                return x.m!.title.localeCompare(y.m!.title);
+            });
+    }, [activity, items, filterType, filterStatus]);
 
-    const setRating = async (mediaId: number, stars: number, status?: string) => {
-        const rating10 = stars * 2;
+    const changeStatusFilter = (nextStatus: string) => {
+        const params = new URLSearchParams(sp);
+        if (nextStatus) params.set("status", nextStatus);
+        else params.delete("status");
+        navigate(`/profile?${params.toString()}`);
+    };
 
-        setActivity((prev) =>
-            prev.map((a) => {
-                const id = a.media_id ?? (a as any).mediaID;
-                if (id !== mediaId) return a;
-                return { ...a, rating: rating10 };
-            })
-        );
-
-        await upsertActivity({
-            media_id: mediaId,
-            rating: rating10,
-            status: status || "viewed",
-        });
+    const removeItem = async (mediaId: number) => {
+        await deleteActivity(mediaId);
+        setActivity((prev) => prev.filter((a) => (a.media_id ?? (a as any).mediaID) !== mediaId));
     };
 
     return (
         <div>
+            <div className={styles.topRow}>
+                <div className={styles.toolbar}>
+                    <div className={styles.filterLabel}>Статус:</div>
+                    <select
+                        className={styles.select}
+                        value={filterStatus}
+                        onChange={(e) => changeStatusFilter(e.target.value)}
+                    >
+                        {statusOptionsForType(filterType).map((opt) => (
+                            <option key={opt.value || "all"} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             {loading && <div className="small">загрузка...</div>}
 
-            {!loading && rows.map(({ a, m, id }) => {
-                const currentStars = a.rating ? Math.round(Number(a.rating) / 2) : 0;
-
-                return (
+            {!loading &&
+                rows.map(({ a, m, id }) => (
                     <div key={id} className={styles.row}>
                         <Link to={`/media/${id}`} className={styles.clickArea}>
                             <div className={styles.cover}>
@@ -124,31 +182,23 @@ export default function Profile() {
                             <div className={styles.info}>
                                 <div className={styles.title}>{m!.title}</div>
                                 <div className={styles.author}>{m!.creator || "—"}</div>
+                                <div className={styles.statusBadge}>
+                                    {STATUS_LABEL[a.status || ""] || a.status}
+                                </div>
                                 <div className={styles.desc}>{m!.description}</div>
                             </div>
                         </Link>
 
-                        <div className={styles.stars}>
-                            <div className={styles.starPick}>
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        className={i + 1 <= currentStars ? styles.on : styles.off}
-                                        onClick={() => setRating(id, i + 1, a.status)}
-                                        aria-label={`rate ${i + 1}`}
-                                    >
-                                        ★
-                                    </button>
-                                ))}
-                            </div>
+                        <div className={styles.side}>
+                            <button className={styles.sideLink} onClick={() => removeItem(id)}>
+                                Убрать из списка
+                            </button>
                         </div>
                     </div>
-                );
-            })}
+                ))}
 
             {!loading && rows.length === 0 && (
-                <div className="small">пока нет активности: добавь статус/оценку любому произведению</div>
+                <div className="small">пока нет активности: добавь статус или оценку любому произведению</div>
             )}
         </div>
     );

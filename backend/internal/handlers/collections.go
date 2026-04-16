@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type collectionDTO struct {
@@ -139,17 +138,18 @@ func GetCollection(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var items []models.CollectionItem
-		db.Where("collection_id = ?", col.ID).Find(&items)
-
-		mediaIDs := make([]uint, 0, len(items))
-		for _, it := range items {
-			mediaIDs = append(mediaIDs, it.MediaID)
+		var links []models.CollectionItem
+		if err := db.Where("collection_id = ?", col.ID).Order("created_at asc").Find(&links).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load items"})
+			return
 		}
 
-		var media []models.MediaItem
-		if len(mediaIDs) > 0 {
-			db.Where("id IN ?", mediaIDs).Find(&media)
+		media := make([]models.MediaItem, 0, len(links))
+		for _, link := range links {
+			var m models.MediaItem
+			if err := db.First(&m, link.MediaID).Error; err == nil {
+				media = append(media, m)
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -201,12 +201,33 @@ func AddToCollection(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		_ = db.Model(&models.MediaItem{}).
-			Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ?", input.MediaID).
-			UpdateColumn("popularity_score", gorm.Expr("COALESCE(popularity_score, 0) + ?", 2.0)).Error
-
 		c.JSON(http.StatusCreated, gin.H{"message": "added"})
+	}
+}
+
+func RemoveFromCollection(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+		id := c.Param("id")
+		mediaID := c.Param("mediaId")
+
+		var col models.Collection
+		if err := db.Where("user_id = ?", userID).First(&col, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
+			return
+		}
+
+		res := db.Where("collection_id = ? AND media_id = ?", col.ID, mediaID).Delete(&models.CollectionItem{})
+		if res.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove"})
+			return
+		}
+		if res.RowsAffected == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "item not found in collection"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "removed"})
 	}
 }
 

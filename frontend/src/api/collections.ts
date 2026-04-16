@@ -15,5 +15,8 @@ export const updateCollection = (
 export const addToCollection = (id: number | string, media_id: number) =>
     api.post(`/collections/${id}/items`, { media_id });
 
+export const removeFromCollection = (id: number | string, mediaId: number) =>
+    api.delete(`/collections/${id}/items/${mediaId}`);
+
 export const getCollectionRecommendations = (id: number | string) =>
     api.get(`/collections/${id}/recommendations`);

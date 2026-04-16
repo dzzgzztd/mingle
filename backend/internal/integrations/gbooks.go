@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,63 @@ type gbooksSearchResp struct {
 			} `json:"imageLinks"`
 		} `json:"volumeInfo"`
 	} `json:"items"`
+}
+
+func normalizeBookTitle(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	replacer := strings.NewReplacer(
+		":", " ",
+		"—", " ",
+		"–", " ",
+		"(", " ",
+		")", " ",
+		"[", " ",
+		"]", " ",
+	)
+	s = replacer.Replace(s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func bookScore(query, title, creator string, year *int, hasImage bool) int {
+	q := normalizeBookTitle(query)
+	t := normalizeBookTitle(title)
+	c := strings.ToLower(strings.TrimSpace(creator))
+
+	score := 0
+
+	switch {
+	case t == q:
+		score += 1000
+	case strings.HasPrefix(t, q):
+		score += 500
+	case strings.Contains(t, q):
+		score += 250
+	}
+
+	for _, part := range strings.Fields(q) {
+		if strings.Contains(t, part) {
+			score += 40
+		}
+		if c != "" && strings.Contains(c, part) {
+			score += 20
+		}
+	}
+
+	if hasImage {
+		score += 40
+	}
+	if creator != "" {
+		score += 20
+	}
+	if year != nil && *year >= 1950 {
+		score += 10
+	}
+
+	if strings.Contains(t, "study guide") || strings.Contains(t, "summary") || strings.Contains(t, "workbook") {
+		score -= 300
+	}
+
+	return score
 }
 
 func (c *GBooksClient) Search(ctx context.Context, q string, page int) ([]ExternalSearchItem, error) {
@@ -78,7 +136,14 @@ func (c *GBooksClient) Search(ctx context.Context, q string, page int) ([]Extern
 		return nil, err
 	}
 
-	out := make([]ExternalSearchItem, 0, len(data.Items))
+	type ranked struct {
+		Item  ExternalSearchItem
+		Score int
+		Key   string
+	}
+
+	bestByTitle := map[string]ranked{}
+
 	for _, it := range data.Items {
 		year := parseYearFromPublished(it.VolumeInfo.PublishedDate)
 		creator := strings.Join(it.VolumeInfo.Authors, ", ")
@@ -86,7 +151,8 @@ func (c *GBooksClient) Search(ctx context.Context, q string, page int) ([]Extern
 		if strings.HasPrefix(img, "http://") {
 			img = "https://" + strings.TrimPrefix(img, "http://")
 		}
-		out = append(out, ExternalSearchItem{
+
+		item := ExternalSearchItem{
 			Source:     "gbooks",
 			ExternalID: it.ID,
 			Type:       "book",
@@ -94,7 +160,36 @@ func (c *GBooksClient) Search(ctx context.Context, q string, page int) ([]Extern
 			Year:       year,
 			Creator:    creator,
 			ImageURL:   img,
-		})
+		}
+
+		key := normalizeBookTitle(it.VolumeInfo.Title)
+		score := bookScore(q, it.VolumeInfo.Title, creator, year, img != "")
+
+		prev, ok := bestByTitle[key]
+		if !ok || score > prev.Score {
+			bestByTitle[key] = ranked{
+				Item:  item,
+				Score: score,
+				Key:   key,
+			}
+		}
+	}
+
+	rankedItems := make([]ranked, 0, len(bestByTitle))
+	for _, v := range bestByTitle {
+		rankedItems = append(rankedItems, v)
+	}
+
+	sort.SliceStable(rankedItems, func(i, j int) bool {
+		if rankedItems[i].Score != rankedItems[j].Score {
+			return rankedItems[i].Score > rankedItems[j].Score
+		}
+		return strings.ToLower(rankedItems[i].Item.Title) < strings.ToLower(rankedItems[j].Item.Title)
+	})
+
+	out := make([]ExternalSearchItem, 0, len(rankedItems))
+	for _, r := range rankedItems {
+		out = append(out, r.Item)
 	}
 
 	return out, nil
@@ -113,6 +208,17 @@ func (c *GBooksClient) GetByID(ctx context.Context, id string) (ExternalDetails,
 	}
 	defer resp.Body.Close()
 
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return ExternalDetails{}, err
+	}
+	if e, ok := raw["error"].(map[string]any); ok {
+		msg, _ := e["message"].(string)
+		code, _ := e["code"].(float64)
+		return ExternalDetails{}, fmt.Errorf("gbooks error (code %.0f): %s", code, msg)
+	}
+
+	b, _ := json.Marshal(raw)
 	var data struct {
 		ID         string `json:"id"`
 		VolumeInfo struct {
@@ -125,7 +231,7 @@ func (c *GBooksClient) GetByID(ctx context.Context, id string) (ExternalDetails,
 			} `json:"imageLinks"`
 		} `json:"volumeInfo"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.Unmarshal(b, &data); err != nil {
 		return ExternalDetails{}, err
 	}
 

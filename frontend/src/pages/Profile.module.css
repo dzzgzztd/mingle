@@ -1,4 +1,37 @@
-.h2{ font-size: 84px; font-weight: 800; margin: 10px 0 16px; }
+.topRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin: 8px 0 18px;
+  flex-wrap:wrap;
+}
+
+.toolbar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.filterLabel{
+  color: rgba(255,255,255,.7);
+  font-size: 14px;
+}
+
+.select{
+  background: rgba(255,255,255,.10);
+  color: var(--text);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline:none;
+}
+
+.select option{
+  color:#111;
+  background:#fff;
+}
+
 .row{
   display:flex;
   gap:24px;
@@ -6,22 +39,30 @@
   border-bottom: 1px solid rgba(255,255,255,.12);
   align-items:flex-start;
 }
+
 .cover :global(.img), .cover :global(.ph){ width: 170px; height: 235px; }
+
 .info{ flex: 1; min-width:0; }
 .title{ font-size: 28px; font-weight: 800; margin-bottom: 2px; }
 .author{ color: var(--accent); font-size: 20px; margin-bottom: 10px; }
+
+.statusBadge{
+  display:inline-flex;
+  align-items:center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border:1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
 .desc{
   color: rgba(255,255,255,.78);
   display:-webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow:hidden;
-}
-.stars{ padding-top: 140px; }
-@media(max-width: 900px){
-  .h2{ font-size: 56px; }
-  .stars{ padding-top: 10px; }
-  .row{ flex-direction:column; }
 }
 
 .clickArea {
@@ -33,31 +74,24 @@
   min-width: 0;
 }
 
-.starPick {
-  display: flex;
-  gap: 6px;
+.side{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:10px;
+  min-width: 140px;
+  padding-top: 8px;
 }
 
-.on {
+.sideLink{
   background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  color: #ffd54a;
+  border:none;
+  color: rgba(255,255,255,.68);
+  cursor:pointer;
+  padding:0;
 }
 
-.off {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.35);
+@media(max-width: 900px){
+  .row{ flex-direction:column; }
+  .side{ align-items:flex-start; min-width: 0; }
 }
-
-.on:hover,
-.off:hover {
-  color: #ffd54a;
-}
-

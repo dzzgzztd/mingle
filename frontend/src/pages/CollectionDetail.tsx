@@ -4,12 +4,12 @@ import {
   addToCollection,
   getCollection,
   getCollectionRecommendations,
+  removeFromCollection,
   updateCollection,
 } from "../api/collections";
 import { getMedia } from "../api/media";
 import type { MediaItem } from "../types/media";
 import RecommendationCard from "../components/RecommendationCard";
-import MediaCard from "../components/MediaCard";
 import type { RecommendationItem } from "../types/recommendation";
 import styles from "./CollectionDetail.module.css";
 
@@ -70,6 +70,11 @@ export default function CollectionDetail() {
     setPicked(null);
     setQuery("");
     setOpen(false);
+    await load();
+  };
+
+  const removeItem = async (mediaId: number) => {
+    await removeFromCollection(colId, mediaId);
     await load();
   };
 
@@ -226,7 +231,21 @@ export default function CollectionDetail() {
         <div className={styles.sectionTitle}>Контент в подборке</div>
         <div className={styles.grid}>
           {items.map((m) => (
-              <MediaCard key={m.id} item={m} />
+              <div key={m.id} className={styles.itemCard}>
+                <a href={`/media/${m.id}`} className={styles.itemLink}>
+                  <div className={styles.itemCoverWrap}>
+                    {m.imageURL ? (
+                        <img className={styles.itemCover} src={m.imageURL} alt={m.title} loading="lazy" />
+                    ) : (
+                        <div className={styles.itemCoverPh} />
+                    )}
+                  </div>
+                  <div className={styles.itemTitle}>{m.title}</div>
+                </a>
+                <button className={styles.removeBtn} onClick={() => removeItem(m.id)}>
+                  Удалить
+                </button>
+              </div>
           ))}
         </div>
 

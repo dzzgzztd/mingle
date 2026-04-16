@@ -42,6 +42,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 	protected.POST("/activity", handlers.UpsertUserMedia(db))
 	protected.GET("/activity", handlers.GetUserActivity(db))
+	protected.DELETE("/activity/:mediaId", handlers.DeleteUserMedia(db))
 
 	protected.GET("/recommendations", handlers.GetRecommendations(db))
 	protected.GET("/media/:id/recommendations", handlers.GetRecommendationsForMedia(db))
@@ -56,6 +57,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	protected.PATCH("/collections/:id", handlers.UpdateCollection(db))
 
 	protected.POST("/collections/:id/items", handlers.AddToCollection(db))
+	protected.DELETE("/collections/:id/items/:mediaId", handlers.RemoveFromCollection(db))
 	protected.GET("/collections/:id/recommendations", handlers.RecommendForCollection(db))
 
 	api.GET("/external/search", handlers.ExternalSearch(db))
