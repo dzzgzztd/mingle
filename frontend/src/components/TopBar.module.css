@@ -1,0 +1,39 @@
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 22px;
+  text-decoration: none;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  padding-right: 6px;
+  box-sizing: border-box;
+}
+
+.link {
+  color: #fff;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.link:hover {
+  opacity: 1;
+}
+
+.sep {
+  opacity: 0.5;
+}

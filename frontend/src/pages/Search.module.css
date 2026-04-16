@@ -1,0 +1,129 @@
+.h2 {
+    font-size: 44px;
+    font-weight: 800;
+    margin: 10px 0 18px;
+}
+
+.grid {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr) 110px;
+    column-gap: 18px;
+    align-items: start;
+    padding: 18px;
+    border-radius: 16px;
+    text-decoration: none;
+    color: inherit;
+    background: rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+}
+
+.cover {
+    width: 160px;
+    min-width: 160px;
+    max-width: 160px;
+    overflow: hidden;
+}
+
+.cover :global(.img),
+.cover :global(.ph){
+    width: 180px;
+    height: 220px;
+    border-radius: 12px;
+}
+
+.info {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 2px;
+}
+
+.name {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+
+    max-width: 100%;
+    overflow: hidden;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.meta {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.35;
+
+    max-width: 100%;
+    overflow: hidden;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.desc {
+    margin-top: 4px;
+    opacity: 0.85;
+    line-height: 1.4;
+    max-width: 100%;
+    overflow: hidden;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+}
+
+.importBtn{
+    width: 110px;
+    justify-self: end;
+    align-self: center;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 10px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.importBtn:hover{
+    border-color: rgba(255,255,255,.35);
+}
+
+@media (max-width: 900px) {
+    .row {
+        grid-template-columns: 120px minmax(0, 1fr);
+        row-gap: 12px;
+    }
+
+    .cover {
+        width: 120px;
+        min-width: 120px;
+        max-width: 120px;
+    }
+
+    .cover :global(.img),
+    .cover :global(.ph){
+        width: 120px;
+        height: 168px;
+    }
+
+    .importBtn{
+        grid-column: 2;
+        width: auto;
+        justify-self: start;
+        margin-top: 2px;
+    }
+}

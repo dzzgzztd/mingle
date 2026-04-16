@@ -1,0 +1,51 @@
+.card{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    background: rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    padding: 10px;
+    cursor:pointer;
+    color: var(--text);
+    text-align:left;
+    min-width: 170px;
+    transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.card:hover{
+    transform: translateY(-1px);
+    border-color: rgba(255,255,255,.18);
+    background: rgba(255,255,255,.075);
+}
+
+.coverWrap{
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255,255,255,.06);
+}
+
+.cover{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display:block;
+}
+
+.coverPh{
+    width:100%;
+    height:100%;
+    background: radial-gradient(circle at 30% 30%, rgba(130,255,230,.55), rgba(255,90,220,.35), rgba(255,255,255,.06));
+}
+
+.title{
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.25;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}

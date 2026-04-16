@@ -1,0 +1,19 @@
+.h2{ font-size: 44px; font-weight: 800; margin: 0 0 18px; }
+.grid{ display:flex; flex-direction:column; gap: 18px; }
+.row{
+  display:flex;
+  gap:22px;
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.cover :global(.img), .cover :global(.ph){ width: 160px; height: 210px; }
+.info{ flex:1; min-width: 0; }
+.name{ font-size: 24px; font-weight: 800; }
+.desc{
+  margin-top: 10px;
+  color: rgba(255,255,255,.78);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow:hidden;
+}

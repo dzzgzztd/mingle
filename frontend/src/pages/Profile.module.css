@@ -1,0 +1,63 @@
+.h2{ font-size: 84px; font-weight: 800; margin: 10px 0 16px; }
+.row{
+  display:flex;
+  gap:24px;
+  padding: 22px 0;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+  align-items:flex-start;
+}
+.cover :global(.img), .cover :global(.ph){ width: 170px; height: 235px; }
+.info{ flex: 1; min-width:0; }
+.title{ font-size: 28px; font-weight: 800; margin-bottom: 2px; }
+.author{ color: var(--accent); font-size: 20px; margin-bottom: 10px; }
+.desc{
+  color: rgba(255,255,255,.78);
+  display:-webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow:hidden;
+}
+.stars{ padding-top: 140px; }
+@media(max-width: 900px){
+  .h2{ font-size: 56px; }
+  .stars{ padding-top: 10px; }
+  .row{ flex-direction:column; }
+}
+
+.clickArea {
+  display: flex;
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.starPick {
+  display: flex;
+  gap: 6px;
+}
+
+.on {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: #ffd54a;
+}
+
+.off {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.on:hover,
+.off:hover {
+  color: #ffd54a;
+}
+

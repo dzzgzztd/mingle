@@ -1,0 +1,53 @@
+.section {
+    margin-bottom: 36px;
+}
+
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.more {
+    font-size: 14px;
+    color: #8fa3ff;
+    text-decoration: none;
+}
+
+.more:hover {
+    text-decoration: underline;
+}
+
+.strip {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+}
+
+.strip::-webkit-scrollbar {
+    height: 6px;
+}
+
+.strip::-webkit-scrollbar-thumb {
+    background: #2b2f45;
+    border-radius: 3px;
+}
+
+.card {
+    flex: 0 0 140px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.cardTitle {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.2;
+    max-height: 2.4em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

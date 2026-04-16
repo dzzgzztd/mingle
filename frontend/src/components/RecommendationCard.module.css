@@ -1,0 +1,14 @@
+.wrap{ display:block; }
+.card{
+  width: 160px;
+  height: 220px;
+  border-radius: 6px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+}
+.cover :global(.img), .cover :global(.ph){
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border:0;
+}

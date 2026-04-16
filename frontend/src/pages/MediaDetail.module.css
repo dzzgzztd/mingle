@@ -1,0 +1,24 @@
+.top{ display:flex; gap:26px; align-items:flex-start; }
+.cover :global(.img), .cover :global(.ph){ width: 260px; height: 360px; }
+.info{ flex:1; min-width:0; }
+.titleRow{ display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
+.title{ font-size: 32px; font-weight: 900; }
+.meta{ margin-top: 6px; color: rgba(255,255,255,.7); display:flex; align-items:center; gap:10px; }
+.dot{ width:4px; height:4px; background: rgba(255,255,255,.35); border-radius: 99px; }
+.desc{ margin-top: 14px; color: rgba(255,255,255,.78); max-width: 820px; }
+.sectionTitle{ font-size: 22px; font-weight: 800; margin: 16px 0 10px; }
+.strip{ display:flex; gap:14px; overflow:auto; padding-bottom: 10px; }
+.starBlock{ text-align:right; }
+.starPick{ display:flex; gap:8px; justify-content:flex-end; margin-top: 8px; }
+.starPick button{
+  background: transparent;
+  border:none;
+  font-size: 22px;
+  cursor:pointer;
+}
+.on{ color: var(--accent); }
+.off{ color: rgba(255,255,255,.25); }
+@media(max-width: 900px){
+  .top{ flex-direction:column; }
+  .cover :global(.img), .cover :global(.ph){ width: 220px; height: 300px; }
+}

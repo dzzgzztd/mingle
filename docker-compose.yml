@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: mingle_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mingle
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mingle"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build: ./backend
+    container_name: mingle_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: mingle
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_ADDR: "redis:6379"
+      JWT_SECRET: supersecretkey
+      OMDB_API_KEY: "98364f71"
+      GOOGLE_BOOKS_API_KEY: "AIzaSyCts9JB2avj-vvzYypda0xKT4uQu9FRAAA"
+      TGDB_API_KEY: "ea83d239de58a0b818a344e6d88410797deb28f290c69b7c438e9b19489132eb"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/seed:/app/seed
+
+  recommendation:
+    build: ./recommendation_service
+    container_name: mingle_recommendation
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: mingle_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

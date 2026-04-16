@@ -1,0 +1,20 @@
+.tabs{
+  display:flex;
+  gap:26px;
+  align-items:center;
+  border-top:1px solid rgba(255,255,255,.12);
+  padding-top: 16px;
+}
+.tab,.active{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color: rgba(255,255,255,.55);
+  padding: 10px 8px;
+}
+.active{
+  color: var(--accent);
+  border-bottom: 2px solid rgba(109,167,255,.8);
+}
+.icon{ filter: grayscale(1) brightness(1.4); }
+.active .icon{ filter:none; }

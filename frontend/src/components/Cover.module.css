@@ -1,0 +1,21 @@
+.img,
+.ph{
+  width: 180px;
+  height: 260px;
+  border-radius: 4px;
+  display: block;
+  border: 1px solid rgba(255,255,255,.12);
+  overflow: hidden;
+}
+
+.img{
+  object-fit: contain;
+  object-position: center;
+  background: rgba(255,255,255,.04);
+}
+
+.ph{
+  filter: saturate(1.1) contrast(1.05);
+  background-size: cover;
+  background-position: center;
+}
