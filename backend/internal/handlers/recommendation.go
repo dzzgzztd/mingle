@@ -17,6 +17,38 @@ type RecommendationDTO struct {
 	Score    float64 `json:"score"`
 }
 
+func mediaToHistoryItem(media models.MediaItem, rating *int) services.HistoryItem {
+	return services.HistoryItem{
+		MediaID:     media.ID,
+		Title:       media.Title,
+		Description: media.Description,
+		Type:        media.Type,
+		Creator:     media.Creator,
+		Year:        media.Year,
+		Rating:      rating,
+	}
+}
+
+func mediaToCatalogItem(media models.MediaItem) services.CatalogItem {
+	return services.CatalogItem{
+		MediaID:     media.ID,
+		Title:       media.Title,
+		Description: media.Description,
+		Type:        media.Type,
+		Creator:     media.Creator,
+		Year:        media.Year,
+	}
+}
+
+func recommendationDTOFromMedia(media models.MediaItem, score float64) RecommendationDTO {
+	return RecommendationDTO{
+		ID:       media.ID,
+		Title:    media.Title,
+		ImageURL: media.ImageURL,
+		Score:    score,
+	}
+}
+
 func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetUint("user_id")
@@ -37,11 +69,7 @@ func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 		for _, a := range activity {
 			var media models.MediaItem
 			if err := db.First(&media, a.MediaID).Error; err == nil {
-				history = append(history, services.HistoryItem{
-					MediaID:     media.ID,
-					Description: media.Description,
-					Rating:      a.Rating,
-				})
+				history = append(history, mediaToHistoryItem(media, a.Rating))
 				exclude = append(exclude, media.ID)
 			}
 		}
@@ -50,7 +78,7 @@ func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 		db.Find(&catalogMedia)
 		catalog := []services.CatalogItem{}
 		for _, m := range catalogMedia {
-			catalog = append(catalog, services.CatalogItem{MediaID: m.ID, Description: m.Description})
+			catalog = append(catalog, mediaToCatalogItem(m))
 		}
 
 		resp, err := services.GetRecommendations(services.RecommendationRequest{
@@ -71,7 +99,7 @@ func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 			if err := db.First(&media, rec.MediaID).Error; err != nil {
 				continue
 			}
-			result = append(result, RecommendationDTO{ID: media.ID, Title: media.Title, ImageURL: media.ImageURL, Score: rec.Score})
+			result = append(result, recommendationDTOFromMedia(media, rec.Score))
 		}
 
 		c.JSON(http.StatusOK, gin.H{"recommendations": result})
@@ -89,14 +117,14 @@ func GetRecommendationsForMedia(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		history := []services.HistoryItem{{MediaID: target.ID, Description: target.Description, Rating: nil}}
+		history := []services.HistoryItem{mediaToHistoryItem(target, nil)}
 		exclude := []uint{target.ID}
 
 		var catalogMedia []models.MediaItem
 		db.Find(&catalogMedia)
 		catalog := []services.CatalogItem{}
 		for _, m := range catalogMedia {
-			catalog = append(catalog, services.CatalogItem{MediaID: m.ID, Description: m.Description})
+			catalog = append(catalog, mediaToCatalogItem(m))
 		}
 
 		resp, err := services.GetRecommendations(services.RecommendationRequest{
@@ -114,8 +142,10 @@ func GetRecommendationsForMedia(db *gorm.DB) gin.HandlerFunc {
 		result := []RecommendationDTO{}
 		for _, rec := range resp.Recommendations {
 			var media models.MediaItem
-			if err := db.First(&media, rec.MediaID).Error; err != nil { continue }
-			result = append(result, RecommendationDTO{ID: media.ID, Title: media.Title, ImageURL: media.ImageURL, Score: rec.Score})
+			if err := db.First(&media, rec.MediaID).Error; err != nil {
+				continue
+			}
+			result = append(result, recommendationDTOFromMedia(media, rec.Score))
 		}
 		c.JSON(http.StatusOK, gin.H{"recommendations": result})
 	}

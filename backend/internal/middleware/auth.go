@@ -5,9 +5,11 @@ import (
 	"strings"
 
 	"mingle_backend/internal/config"
+	"mingle_backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 func AuthRequired() gin.HandlerFunc {
@@ -46,6 +48,30 @@ func AuthRequired() gin.HandlerFunc {
 		}
 
 		c.Set("user_id", uint(userID))
+		c.Next()
+	}
+}
+
+func AdminRequired(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+		if userID == 0 {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
+			return
+		}
+
+		var user models.User
+		if err := db.First(&user, userID).Error; err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+
+		if user.Role != models.RoleAdmin {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+			return
+		}
+
+		c.Set("user_role", string(user.Role))
 		c.Next()
 	}
 }

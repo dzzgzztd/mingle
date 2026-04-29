@@ -30,10 +30,17 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		role := models.RoleUser
+		var usersCount int64
+		if err := db.Model(&models.User{}).Count(&usersCount).Error; err == nil && usersCount == 0 {
+			role = models.RoleAdmin
+		}
+
 		user := models.User{
 			Email:    req.Email,
 			Password: hash,
 			Name:     req.Name,
+			Role:     role,
 		}
 
 		if err := db.Create(&user).Error; err != nil {
@@ -41,7 +48,7 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"message": "registered"})
+		c.JSON(http.StatusCreated, gin.H{"message": "registered", "role": user.Role})
 	}
 }
 
@@ -64,12 +71,17 @@ func Login(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if user.Role == "" {
+			user.Role = models.RoleUser
+			_ = db.Save(&user).Error
+		}
+
 		token, err := services.GenerateToken(user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "token generation failed"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"token": token})
+		c.JSON(http.StatusOK, gin.H{"token": token, "role": user.Role})
 	}
 }

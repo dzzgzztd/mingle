@@ -53,6 +53,19 @@ type tgdbDeveloperItem struct {
 	Name string `json:"name"`
 }
 
+type tgdbGame struct {
+	ID          int    `json:"id"`
+	GameTitle   string `json:"game_title"`
+	Name        string `json:"name"`
+	ReleaseDate string `json:"release_date"`
+	Overview    string `json:"overview"`
+	Description string `json:"description"`
+	Developers  any    `json:"developers"`
+	Platform    int    `json:"platform"`
+	RegionID    int    `json:"region_id"`
+	CountryID   int    `json:"country_id"`
+}
+
 func tgdbPickBaseURL(base tgdbBoxartBaseURL) string {
 	for _, s := range []string{
 		base.Medium,
@@ -128,13 +141,7 @@ func tgdbReleaseScore(year *int) int {
 	return y - 2000
 }
 
-func tgdbCandidateScore(
-	title string,
-	year *int,
-	imageURL string,
-	regionID int,
-	countryID int,
-) int {
+func tgdbCandidateScore(title string, year *int, imageURL string, regionID int, countryID int) int {
 	score := 0
 
 	if imageURL != "" {
@@ -157,43 +164,140 @@ func tgdbCandidateScore(
 	return score
 }
 
-func tgdbDeveloperNames(raw any, include map[string]tgdbDeveloperItem) string {
+func tgdbDeveloperMap(raw json.RawMessage) map[string]string {
+	out := map[string]string{}
+	if len(raw) == 0 || string(raw) == "null" {
+		return out
+	}
+
+	var asMap map[string]tgdbDeveloperItem
+	if err := json.Unmarshal(raw, &asMap); err == nil {
+		for id, dev := range asMap {
+			if strings.TrimSpace(dev.Name) != "" {
+				out[id] = strings.TrimSpace(dev.Name)
+			}
+		}
+		return out
+	}
+
+	var asSlice []tgdbDeveloperItem
+	if err := json.Unmarshal(raw, &asSlice); err == nil {
+		for _, dev := range asSlice {
+			if dev.ID != 0 && strings.TrimSpace(dev.Name) != "" {
+				out[strconv.Itoa(dev.ID)] = strings.TrimSpace(dev.Name)
+			}
+		}
+	}
+
+	return out
+}
+
+func tgdbDeveloperNames(raw any, include map[string]string) string {
+	push := func(names []string, id string) []string {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return names
+		}
+		if name, ok := include[id]; ok && strings.TrimSpace(name) != "" {
+			return append(names, strings.TrimSpace(name))
+		}
+		if _, err := strconv.Atoi(id); err != nil {
+			return append(names, id)
+		}
+		return names
+	}
+
+	names := []string{}
+
 	switch v := raw.(type) {
 	case []any:
-		names := make([]string, 0, len(v))
 		for _, item := range v {
 			switch idv := item.(type) {
 			case float64:
-				id := strconv.Itoa(int(idv))
-				if dev, ok := include[id]; ok && strings.TrimSpace(dev.Name) != "" {
-					names = append(names, strings.TrimSpace(dev.Name))
-				}
+				names = push(names, strconv.Itoa(int(idv)))
 			case string:
-				if strings.TrimSpace(idv) != "" {
-					if dev, ok := include[idv]; ok && strings.TrimSpace(dev.Name) != "" {
-						names = append(names, strings.TrimSpace(dev.Name))
-					}
+				names = push(names, idv)
+			case map[string]any:
+				if name, ok := idv["name"].(string); ok {
+					names = push(names, name)
+				} else if id, ok := idv["id"].(float64); ok {
+					names = push(names, strconv.Itoa(int(id)))
 				}
 			}
-		}
-		if len(names) > 0 {
-			return strings.Join(names, ", ")
 		}
 	case []int:
-		names := make([]string, 0, len(v))
 		for _, idNum := range v {
-			id := strconv.Itoa(idNum)
-			if dev, ok := include[id]; ok && strings.TrimSpace(dev.Name) != "" {
-				names = append(names, strings.TrimSpace(dev.Name))
-			}
+			names = push(names, strconv.Itoa(idNum))
 		}
-		if len(names) > 0 {
-			return strings.Join(names, ", ")
-		}
+	case float64:
+		names = push(names, strconv.Itoa(int(v)))
+	case int:
+		names = push(names, strconv.Itoa(v))
 	case string:
-		return strings.TrimSpace(v)
+		for _, part := range strings.Split(v, ",") {
+			names = push(names, part)
+		}
+	case map[string]any:
+		if name, ok := v["name"].(string); ok {
+			names = push(names, name)
+		} else if id, ok := v["id"].(float64); ok {
+			names = push(names, strconv.Itoa(int(id)))
+		}
 	}
 
+	if len(names) == 0 {
+		return ""
+	}
+
+	seen := map[string]bool{}
+	uniq := make([]string, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		uniq = append(uniq, name)
+	}
+
+	return strings.Join(uniq, ", ")
+}
+
+func tgdbParseGames(raw json.RawMessage) []tgdbGame {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+
+	var asSlice []tgdbGame
+	if err := json.Unmarshal(raw, &asSlice); err == nil {
+		return asSlice
+	}
+
+	var asMap map[string]tgdbGame
+	if err := json.Unmarshal(raw, &asMap); err == nil {
+		out := make([]tgdbGame, 0, len(asMap))
+		for _, game := range asMap {
+			out = append(out, game)
+		}
+		return out
+	}
+
+	return nil
+}
+
+func tgdbGameTitle(g tgdbGame) string {
+	if strings.TrimSpace(g.GameTitle) != "" {
+		return strings.TrimSpace(g.GameTitle)
+	}
+	return strings.TrimSpace(g.Name)
+}
+
+func tgdbGameDescription(g tgdbGame) string {
+	for _, s := range []string{g.Overview, g.Description} {
+		if strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s)
+		}
+	}
 	return ""
 }
 
@@ -207,6 +311,7 @@ func (c *TGDBClient) Search(ctx context.Context, q string, page int) ([]External
 	v.Set("apikey", c.apiKey)
 	v.Set("name", q)
 	v.Set("include", "boxart,developers")
+	v.Set("fields", "overview")
 	if page > 1 {
 		v.Set("page", strconv.Itoa(page))
 	}
@@ -221,15 +326,7 @@ func (c *TGDBClient) Search(ctx context.Context, q string, page int) ([]External
 
 	var data struct {
 		Data struct {
-			Games []struct {
-				ID          int    `json:"id"`
-				GameTitle   string `json:"game_title"`
-				ReleaseDate string `json:"release_date"`
-				Platform    int    `json:"platform"`
-				RegionID    int    `json:"region_id"`
-				CountryID   int    `json:"country_id"`
-				Developers  any    `json:"developers"`
-			} `json:"games"`
+			Games json.RawMessage `json:"games"`
 		} `json:"data"`
 		Include struct {
 			Boxart struct {
@@ -237,7 +334,7 @@ func (c *TGDBClient) Search(ctx context.Context, q string, page int) ([]External
 				Data    map[string][]tgdbBoxartItem `json:"data"`
 			} `json:"boxart"`
 			Developers struct {
-				Data map[string]tgdbDeveloperItem `json:"data"`
+				Data json.RawMessage `json:"data"`
 			} `json:"developers"`
 		} `json:"include"`
 	}
@@ -245,6 +342,8 @@ func (c *TGDBClient) Search(ctx context.Context, q string, page int) ([]External
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, err
 	}
+
+	developers := tgdbDeveloperMap(data.Include.Developers.Data)
 
 	type candidate struct {
 		Item      ExternalSearchItem
@@ -254,23 +353,27 @@ func (c *TGDBClient) Search(ctx context.Context, q string, page int) ([]External
 
 	bestByTitle := map[string]candidate{}
 
-	for _, g := range data.Data.Games {
+	for _, g := range tgdbParseGames(data.Data.Games) {
+		title := tgdbGameTitle(g)
+		if title == "" {
+			continue
+		}
 		year := parseYearFromPublished(g.ReleaseDate)
 		img := tgdbBoxartURL(g.ID, data.Include.Boxart.BaseURL, data.Include.Boxart.Data)
-		creator := tgdbDeveloperNames(g.Developers, data.Include.Developers.Data)
+		creator := tgdbDeveloperNames(g.Developers, developers)
 
 		item := ExternalSearchItem{
 			Source:     "tgdb",
 			ExternalID: strconv.Itoa(g.ID),
 			Type:       "game",
-			Title:      g.GameTitle,
+			Title:      title,
 			Year:       year,
 			Creator:    creator,
 			ImageURL:   img,
 		}
 
-		norm := tgdbNormalizeTitle(g.GameTitle)
-		score := tgdbCandidateScore(g.GameTitle, year, img, g.RegionID, g.CountryID)
+		norm := tgdbNormalizeTitle(title)
+		score := tgdbCandidateScore(title, year, img, g.RegionID, g.CountryID)
 
 		prev, exists := bestByTitle[norm]
 		if !exists || score > prev.Score {
@@ -312,6 +415,7 @@ func (c *TGDBClient) GetByID(ctx context.Context, id string) (ExternalDetails, e
 	v.Set("apikey", c.apiKey)
 	v.Set("id", id)
 	v.Set("include", "boxart,developers")
+	v.Set("fields", "overview")
 	u.RawQuery = v.Encode()
 
 	req, _ := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
@@ -323,13 +427,7 @@ func (c *TGDBClient) GetByID(ctx context.Context, id string) (ExternalDetails, e
 
 	var data struct {
 		Data struct {
-			Games []struct {
-				ID          int    `json:"id"`
-				GameTitle   string `json:"game_title"`
-				ReleaseDate string `json:"release_date"`
-				Overview    string `json:"overview"`
-				Developers  any    `json:"developers"`
-			} `json:"games"`
+			Games json.RawMessage `json:"games"`
 		} `json:"data"`
 		Include struct {
 			Boxart struct {
@@ -337,7 +435,7 @@ func (c *TGDBClient) GetByID(ctx context.Context, id string) (ExternalDetails, e
 				Data    map[string][]tgdbBoxartItem `json:"data"`
 			} `json:"boxart"`
 			Developers struct {
-				Data map[string]tgdbDeveloperItem `json:"data"`
+				Data json.RawMessage `json:"data"`
 			} `json:"developers"`
 		} `json:"include"`
 	}
@@ -345,25 +443,29 @@ func (c *TGDBClient) GetByID(ctx context.Context, id string) (ExternalDetails, e
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return ExternalDetails{}, err
 	}
-	if len(data.Data.Games) == 0 {
+
+	games := tgdbParseGames(data.Data.Games)
+	if len(games) == 0 {
 		return ExternalDetails{}, errors.New("tgdb: not found")
 	}
 
-	g := data.Data.Games[0]
+	developers := tgdbDeveloperMap(data.Include.Developers.Data)
+	g := games[0]
 	year := parseYearFromPublished(g.ReleaseDate)
 	img := tgdbBoxartURL(g.ID, data.Include.Boxart.BaseURL, data.Include.Boxart.Data)
-	creator := tgdbDeveloperNames(g.Developers, data.Include.Developers.Data)
+	creator := tgdbDeveloperNames(g.Developers, developers)
+	title := tgdbGameTitle(g)
 
 	return ExternalDetails{
 		ExternalSearchItem: ExternalSearchItem{
 			Source:     "tgdb",
 			ExternalID: strconv.Itoa(g.ID),
 			Type:       "game",
-			Title:      g.GameTitle,
+			Title:      title,
 			Year:       year,
 			Creator:    creator,
 			ImageURL:   img,
 		},
-		Description: strings.TrimSpace(g.Overview),
+		Description: tgdbGameDescription(g),
 	}, nil
 }

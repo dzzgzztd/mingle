@@ -58,8 +58,8 @@ func CreateMedia(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if input.Title == "" || input.Type == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "title and type are required"})
+		if strings.TrimSpace(input.Title) == "" || !isAllowedMediaType(input.Type) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "valid title and type are required"})
 			return
 		}
 		if err := db.Create(&input).Error; err != nil {

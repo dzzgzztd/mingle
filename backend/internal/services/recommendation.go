@@ -12,13 +12,21 @@ import (
 
 type HistoryItem struct {
 	MediaID     uint   `json:"media_id"`
+	Title       string `json:"title,omitempty"`
 	Description string `json:"description"`
+	Type        string `json:"type,omitempty"`
+	Creator     string `json:"creator,omitempty"`
+	Year        *int   `json:"year,omitempty"`
 	Rating      *int   `json:"rating"`
 }
 
 type CatalogItem struct {
 	MediaID     uint   `json:"media_id"`
+	Title       string `json:"title,omitempty"`
 	Description string `json:"description"`
+	Type        string `json:"type,omitempty"`
+	Creator     string `json:"creator,omitempty"`
+	Year        *int   `json:"year,omitempty"`
 }
 
 type RecommendationRequest struct {

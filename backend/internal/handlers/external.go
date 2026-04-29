@@ -13,6 +13,69 @@ import (
 	"gorm.io/gorm"
 )
 
+func normalizeSearchText(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	replacer := strings.NewReplacer(
+		":", " ",
+		"—", " ",
+		"–", " ",
+		"(", " ",
+		")", " ",
+		"[", " ",
+		"]", " ",
+		"_", " ",
+	)
+	s = replacer.Replace(s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func searchScore(query, title, creator string, year *int, hasImage bool) int {
+	q := normalizeSearchText(query)
+	t := normalizeSearchText(title)
+	c := normalizeSearchText(creator)
+
+	if q == "" || t == "" {
+		return 0
+	}
+
+	score := 0
+
+	switch {
+	case t == q:
+		score += 1200
+	case strings.HasPrefix(t, q):
+		score += 700
+	case strings.Contains(t, q):
+		score += 350
+	}
+
+	for _, token := range strings.Fields(q) {
+		if strings.Contains(t, token) {
+			score += 40
+		}
+		if c != "" && strings.Contains(c, token) {
+			score += 15
+		}
+	}
+
+	if hasImage {
+		score += 35
+	}
+	if creator != "" {
+		score += 15
+	}
+	if year != nil && *year >= 1950 {
+		score += 5
+	}
+
+	lowTitle := strings.ToLower(title)
+	if strings.Contains(lowTitle, "summary") || strings.Contains(lowTitle, "guide") || strings.Contains(lowTitle, "workbook") {
+		score -= 120
+	}
+
+	return score
+}
+
 func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 	omdb := integrations.NewOMDb()
 	gbooks := integrations.NewGBooks()
@@ -25,14 +88,13 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		typ := strings.TrimSpace(c.Query("type"))
 		src := strings.TrimSpace(c.Query("source"))
 		page := 1
 
 		var items []integrations.ExternalSearchItem
 
-		switch {
-		case src == "omdb":
+		switch src {
+		case "omdb":
 			res, err := omdb.Search(c.Request.Context(), q, page)
 			if err != nil {
 				log.Println("[external-search][omdb] error:", err)
@@ -41,7 +103,7 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			}
 			items = append(items, res...)
 
-		case src == "gbooks":
+		case "gbooks":
 			res, err := gbooks.Search(c.Request.Context(), q, page)
 			if err != nil {
 				log.Println("[external-search][gbooks] error:", err)
@@ -50,34 +112,7 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			}
 			items = append(items, res...)
 
-		case src == "tgdb":
-			res, err := tgdb.Search(c.Request.Context(), q, page)
-			if err != nil {
-				log.Println("[external-search][tgdb] error:", err)
-				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-				return
-			}
-			items = append(items, res...)
-
-		case typ == "movie" || typ == "series":
-			res, err := omdb.Search(c.Request.Context(), q, page)
-			if err != nil {
-				log.Println("[external-search][omdb] error:", err)
-				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-				return
-			}
-			items = append(items, res...)
-
-		case typ == "book":
-			res, err := gbooks.Search(c.Request.Context(), q, page)
-			if err != nil {
-				log.Println("[external-search][gbooks] error:", err)
-				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-				return
-			}
-			items = append(items, res...)
-
-		case typ == "game":
+		case "tgdb":
 			res, err := tgdb.Search(c.Request.Context(), q, page)
 			if err != nil {
 				log.Println("[external-search][tgdb] error:", err)
@@ -106,41 +141,14 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
-		if typ != "" {
-			filtered := make([]integrations.ExternalSearchItem, 0, len(items))
-			for _, it := range items {
-				if it.Type == typ {
-					filtered = append(filtered, it)
-				}
+		sort.SliceStable(items, func(i, j int) bool {
+			si := searchScore(q, items[i].Title, items[i].Creator, items[i].Year, items[i].ImageURL != "")
+			sj := searchScore(q, items[j].Title, items[j].Creator, items[j].Year, items[j].ImageURL != "")
+			if si != sj {
+				return si > sj
 			}
-			items = filtered
-		}
-
-		if typ == "" {
-			typeRank := func(t string) int {
-				switch t {
-				case "movie":
-					return 1
-				case "series":
-					return 2
-				case "book":
-					return 3
-				case "game":
-					return 4
-				default:
-					return 10
-				}
-			}
-
-			sort.SliceStable(items, func(i, j int) bool {
-				ri := typeRank(items[i].Type)
-				rj := typeRank(items[j].Type)
-				if ri != rj {
-					return ri < rj
-				}
-				return strings.ToLower(items[i].Title) < strings.ToLower(items[j].Title)
-			})
-		}
+			return strings.ToLower(items[i].Title) < strings.ToLower(items[j].Title)
+		})
 
 		c.JSON(http.StatusOK, gin.H{"items": items})
 	}

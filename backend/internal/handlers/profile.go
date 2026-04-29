@@ -19,11 +19,17 @@ func GetProfile(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		role := user.Role
+		if role == "" {
+			role = models.RoleUser
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"id":        user.ID,
-			"email":     user.Email,
-			"name":      user.Name,
+			"id":         user.ID,
+			"email":      user.Email,
+			"name":       user.Name,
 			"avatar_url": user.AvatarURL,
+			"role":       role,
 		})
 	}
 }
@@ -33,7 +39,7 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		userID := c.GetUint("user_id")
 
 		var input struct {
-			Name string `json:"name"`
+			Name      string `json:"name"`
 			AvatarURL string `json:"avatar_url"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
