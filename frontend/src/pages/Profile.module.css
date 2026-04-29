@@ -93,5 +93,7 @@
 
 @media(max-width: 900px){
   .row{ flex-direction:column; }
+  .clickArea{ flex-direction:column; }
   .side{ align-items:flex-start; min-width: 0; }
+  .topRow{ align-items:flex-start; flex-direction:column; }
 }

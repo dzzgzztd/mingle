@@ -34,8 +34,30 @@
 .profileActions{
   display:flex;
   justify-content:flex-end;
+  align-items:center;
   align-self:start;
+  gap:10px;
   padding-top: 4px;
+  flex-wrap:wrap;
+}
+
+.logoutBtn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  background: rgba(255, 76, 76, .14);
+  color: #ffd6d6;
+  border:1px solid rgba(255, 99, 99, .55);
+  padding:10px 14px;
+  border-radius: 999px;
+  cursor:pointer;
+  font: inherit;
+}
+
+.logoutBtn:hover{
+  background: rgba(255, 76, 76, .22);
+  border-color: rgba(255, 130, 130, .75);
+  color:#fff;
 }
 
 .title{

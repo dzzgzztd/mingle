@@ -1,13 +1,13 @@
 .top{ display:flex; gap:26px; align-items:flex-start; }
-.cover :global(.img), .cover :global(.ph){ width: 260px; height: 360px; }
+.cover :global(.img), .cover :global(.ph){ width: 260px; height: 360px; object-fit: contain; object-position:center; }
 .info{ flex:1; min-width:0; }
 .titleRow{ display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
 .title{ font-size: 32px; font-weight: 900; }
 .meta{ margin-top: 6px; color: rgba(255,255,255,.7); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .dot{ width:4px; height:4px; background: rgba(255,255,255,.35); border-radius: 99px; }
-.desc{ margin-top: 16px; color: rgba(255,255,255,.78); max-width: 820px; }
+.desc{ margin-top: 16px; color: rgba(255,255,255,.78); max-width: 820px; white-space: pre-wrap; line-height: 1.45; }
 .sectionTitle{ font-size: 22px; font-weight: 800; margin: 16px 0 10px; }
-.strip{ display:flex; gap:14px; overflow:auto; padding-bottom: 10px; }
+.strip{ display:flex; align-items:flex-start; gap:16px; overflow:auto; padding: 4px 0 14px; }
 
 .starBlock{ text-align:right; min-width: 160px; }
 .starPick{ display:flex; gap:8px; justify-content:flex-end; margin-top: 8px; }
@@ -47,15 +47,23 @@
   color: rgba(255,255,255,.7);
 }
 
-.select{
+.select,
+.input,
+.textarea{
   width: 100%;
-  max-width: 320px;
+  max-width: 420px;
   background: rgba(255,255,255,.10);
   color: var(--text);
   border:1px solid rgba(255,255,255,.14);
   border-radius: 12px;
   padding: 11px 12px;
   outline:none;
+}
+
+.textarea{
+  max-width: 820px;
+  min-height: 150px;
+  resize: vertical;
 }
 
 .select option{
@@ -76,10 +84,64 @@
   font-size: 14px;
 }
 
+.adminPanel{
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  background: rgba(255,255,255,.045);
+  max-width: 860px;
+}
+
+.adminTitle{
+  font-size: 18px;
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
+.adminActions{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.adminForm{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.formGrid{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 130px 170px;
+  gap:10px;
+}
+
+.dangerBtn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  background: rgba(255, 76, 76, .14);
+  color: #ffd6d6;
+  border:1px solid rgba(255, 99, 99, .55);
+  padding:10px 14px;
+  border-radius: 999px;
+  cursor:pointer;
+  font: inherit;
+}
+
+.dangerBtn:hover{
+  background: rgba(255, 76, 76, .22);
+  border-color: rgba(255, 130, 130, .75);
+  color:#fff;
+}
+
 @media(max-width: 900px){
   .top{ flex-direction:column; }
   .cover :global(.img), .cover :global(.ph){ width: 220px; height: 300px; }
   .titleRow{ flex-direction:column; }
   .starBlock{ text-align:left; min-width: 0; }
   .starPick{ justify-content:flex-start; }
+  .formGrid{ grid-template-columns:1fr; }
 }
