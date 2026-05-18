@@ -118,9 +118,6 @@ export default function CollectionDetail() {
                   <button className="btn" onClick={() => setIsEditing(true)}>
                     Редактировать
                   </button>
-                  <button className="btn" onClick={loadRecs}>
-                    Рекомендации 💡
-                  </button>
                 </div>
               </div>
             </>
@@ -223,7 +220,7 @@ export default function CollectionDetail() {
               Добавить в подборку ＋
             </button>
             <button className="btn" onClick={loadRecs}>
-              Получить рекомендации 💡
+              Получить рекомендации
             </button>
           </div>
         </div>

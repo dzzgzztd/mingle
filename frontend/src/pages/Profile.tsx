@@ -1,16 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { deleteActivity, getActivity } from "../api/profile";
-import { getMediaById } from "../api/media";
-import type { MediaItem } from "../types/media";
+import {useCallback, useEffect, useMemo, useState} from "react";
+import {deleteActivity, getActivity, upsertActivity} from "../api/profile";
+import RatingControl from "../components/RatingControl";
+import {getMediaById} from "../api/media";
+import type {MediaItem} from "../types/media";
 import Cover from "../components/Cover";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {Link, useNavigate, useSearchParams} from "react-router-dom";
 import styles from "./Profile.module.css";
 
 type ActivityItem = {
-    mediaID?: number;
+    id?: number;
     media_id: number;
+    mediaID?: number;
+    MediaID?: number;
     rating?: number | null;
     status?: string;
+    updated_at?: string;
+    UpdatedAt?: string;
+    created_at?: string;
+    CreatedAt?: string;
 };
 
 const ALLOWED = new Set([
@@ -28,37 +35,61 @@ const STATUS_LABEL: Record<string, string> = {
     will_play: "Хочу пройти",
 };
 
+function getActivityMediaId(a: ActivityItem) {
+    return a.media_id ?? a.mediaID ?? a.MediaID;
+}
+
+function getActivityTime(a: ActivityItem) {
+    const raw = a.updated_at || a.UpdatedAt || a.created_at || a.CreatedAt || "";
+    const time = new Date(raw).getTime();
+    return Number.isNaN(time) ? 0 : time;
+}
+
 function statusOptionsForType(type?: string | null) {
     switch (type) {
         case "movie":
         case "series":
             return [
-                { value: "", label: "Все статусы" },
-                { value: "viewed", label: "Посмотрел(а)" },
-                { value: "will_watch", label: "Буду смотреть" },
+                {value: "", label: "Все статусы"},
+                {value: "viewed", label: "Посмотрел(а)"},
+                {value: "will_watch", label: "Буду смотреть"},
             ];
         case "book":
             return [
-                { value: "", label: "Все статусы" },
-                { value: "read", label: "Прочитал(а)" },
-                { value: "will_read", label: "Буду читать" },
+                {value: "", label: "Все статусы"},
+                {value: "read", label: "Прочитал(а)"},
+                {value: "will_read", label: "Буду читать"},
             ];
         case "game":
             return [
-                { value: "", label: "Все статусы" },
-                { value: "completed", label: "Прошел(а)" },
-                { value: "will_play", label: "Хочу пройти" },
+                {value: "", label: "Все статусы"},
+                {value: "completed", label: "Прошел(а)"},
+                {value: "will_play", label: "Хочу пройти"},
             ];
         default:
             return [
-                { value: "", label: "Все статусы" },
-                { value: "viewed", label: "Посмотрел(а)" },
-                { value: "will_watch", label: "Буду смотреть" },
-                { value: "read", label: "Прочитал(а)" },
-                { value: "will_read", label: "Буду читать" },
-                { value: "completed", label: "Прошел(а)" },
-                { value: "will_play", label: "Хочу пройти" },
+                {value: "", label: "Все статусы"},
+                {value: "viewed", label: "Посмотрел(а)"},
+                {value: "will_watch", label: "Буду смотреть"},
+                {value: "read", label: "Прочитал(а)"},
+                {value: "will_read", label: "Буду читать"},
+                {value: "completed", label: "Прошел(а)"},
+                {value: "will_play", label: "Хочу пройти"},
             ];
+    }
+}
+
+function defaultStatusForType(type?: string | null) {
+    switch (type) {
+        case "movie":
+        case "series":
+            return "viewed";
+        case "book":
+            return "read";
+        case "game":
+            return "completed";
+        default:
+            return "";
     }
 }
 
@@ -73,82 +104,136 @@ export default function Profile() {
     const filterType = sp.get("type");
     const filterStatus = sp.get("status") ?? "";
 
-    useEffect(() => {
-        let cancelled = false;
+    const [savingRatingId, setSavingRatingId] = useState<number | null>(null);
 
-        (async () => {
-            setLoading(true);
+    const loadActivity = useCallback(async () => {
+        setLoading(true);
 
-            try {
-                const aRes = await getActivity();
-                const act: ActivityItem[] = aRes.data ?? [];
-                if (cancelled) return;
+        try {
+            const aRes = await getActivity();
+            const act: ActivityItem[] = aRes.data ?? [];
 
-                const filtered = act.filter((a) => a.status && ALLOWED.has(a.status));
-                setActivity(filtered);
+            const filtered = act.filter((a) => a.status && ALLOWED.has(a.status));
+            setActivity(filtered);
 
-                const ids = Array.from(
-                    new Set(filtered.map((a) => a.media_id ?? (a as any).mediaID).filter(Boolean))
-                ).slice(0, 120);
+            const ids = Array.from(
+                new Set(
+                    filtered
+                        .map(getActivityMediaId)
+                        .filter((id): id is number => typeof id === "number" && id > 0)
+                )
+            ).slice(0, 120);
 
-                const pairs = await Promise.all(
-                    ids.map(async (id) => {
-                        try {
-                            const res = await getMediaById(String(id));
-                            return [id, res.data] as const;
-                        } catch {
-                            return null;
-                        }
-                    })
-                );
+            const pairs = await Promise.all(
+                ids.map(async (id) => {
+                    try {
+                        const res = await getMediaById(String(id));
+                        return [id, res.data] as const;
+                    } catch {
+                        return null;
+                    }
+                })
+            );
 
-                if (cancelled) return;
-
-                const map: Record<number, MediaItem> = {};
-                for (const p of pairs) {
-                    if (!p) continue;
-                    const [id, m] = p;
-                    map[id] = m;
-                }
-                setItems(map);
-            } finally {
-                if (!cancelled) setLoading(false);
+            const map: Record<number, MediaItem> = {};
+            for (const p of pairs) {
+                if (!p) continue;
+                const [id, m] = p;
+                map[id] = m;
             }
-        })();
 
-        return () => {
-            cancelled = true;
-        };
+            setItems(map);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        loadActivity();
+    }, [loadActivity]);
 
     const rows = useMemo(() => {
         return activity
             .map((a) => {
-                const id = a.media_id ?? (a as any).mediaID;
-                const m = items[id];
-                return { a, m, id };
+                const id = getActivityMediaId(a);
+                const m = id ? items[id] : undefined;
+                return {a, m, id};
             })
-            .filter((x) => x.m)
+            .filter((x) => x.id && x.m)
             .filter((x) => !filterType || x.m!.type === filterType)
             .filter((x) => !filterStatus || x.a.status === filterStatus)
             .sort((x, y) => {
-                const aStatus = x.a.status || "";
-                const bStatus = y.a.status || "";
-                if (aStatus !== bStatus) return aStatus.localeCompare(bStatus);
-                return x.m!.title.localeCompare(y.m!.title);
+                const byTime = getActivityTime(y.a) - getActivityTime(x.a);
+                if (byTime !== 0) return byTime;
+                return Number(y.id) - Number(x.id);
             });
     }, [activity, items, filterType, filterStatus]);
 
     const changeStatusFilter = (nextStatus: string) => {
         const params = new URLSearchParams(sp);
+
         if (nextStatus) params.set("status", nextStatus);
         else params.delete("status");
-        navigate(`/profile?${params.toString()}`);
+
+        const query = params.toString();
+        navigate(query ? `/profile?${query}` : "/profile");
     };
 
     const removeItem = async (mediaId: number) => {
         await deleteActivity(mediaId);
-        setActivity((prev) => prev.filter((a) => (a.media_id ?? (a as any).mediaID) !== mediaId));
+        await loadActivity();
+        window.dispatchEvent(new Event("profile-activity-updated"));
+    };
+
+    const saveProfileRating = async (
+        mediaId: number,
+        stars: number,
+        currentStatus?: string
+    ) => {
+        const media = items[mediaId];
+        const nextStatus = currentStatus || defaultStatusForType(media?.type);
+
+        if (!nextStatus) return;
+
+        setSavingRatingId(mediaId);
+
+        try {
+            await upsertActivity({
+                media_id: mediaId,
+                status: nextStatus,
+                rating: stars * 2,
+            });
+
+            await loadActivity();
+            window.dispatchEvent(new Event("profile-activity-updated"));
+        } finally {
+            setSavingRatingId(null);
+        }
+    };
+
+    const clearProfileRating = async (
+        mediaId: number,
+        currentStatus?: string
+    ) => {
+        const media = items[mediaId];
+        const nextStatus = currentStatus || defaultStatusForType(media?.type);
+
+        if (!nextStatus) return;
+
+        setSavingRatingId(mediaId);
+
+        try {
+            await upsertActivity({
+                media_id: mediaId,
+                status: nextStatus,
+                rating: null,
+            });
+
+            await loadActivity();
+            window.dispatchEvent(new Event("profile-activity-updated"));
+        } finally {
+            setSavingRatingId(null);
+        }
     };
 
     return (
@@ -156,6 +241,7 @@ export default function Profile() {
             <div className={styles.topRow}>
                 <div className={styles.toolbar}>
                     <div className={styles.filterLabel}>Статус:</div>
+
                     <select
                         className={styles.select}
                         value={filterStatus}
@@ -173,32 +259,54 @@ export default function Profile() {
             {loading && <div className="small">загрузка...</div>}
 
             {!loading &&
-                rows.map(({ a, m, id }) => (
-                    <div key={id} className={styles.row}>
-                        <Link to={`/media/${id}`} className={styles.clickArea}>
-                            <div className={styles.cover}>
-                                <Cover src={m!.imageURL ?? undefined} seed={String(id)} />
-                            </div>
-                            <div className={styles.info}>
-                                <div className={styles.title}>{m!.title}</div>
-                                <div className={styles.author}>{m!.creator || "—"}</div>
-                                <div className={styles.statusBadge}>
-                                    {STATUS_LABEL[a.status || ""] || a.status}
-                                </div>
-                                <div className={styles.desc}>{m!.description}</div>
-                            </div>
-                        </Link>
+                rows.map(({a, m, id}) => {
+                    const ratingValue = a.rating ?? 0;
 
-                        <div className={styles.side}>
-                            <button className={styles.sideLink} onClick={() => removeItem(id)}>
-                                Убрать из списка
-                            </button>
+                    return (
+                        <div key={id} className={styles.row}>
+                            <Link to={`/media/${id}`} className={styles.clickArea}>
+                                <div className={styles.cover}>
+                                    <Cover src={m!.imageURL ?? undefined} seed={String(id)}/>
+                                </div>
+
+                                <div className={styles.info}>
+                                    <div className={styles.title}>{m!.title}</div>
+                                    <div className={styles.author}>{m!.creator || "—"}</div>
+
+                                    <div className={styles.statusBadge}>
+                                        {STATUS_LABEL[a.status || ""] || a.status}
+                                    </div>
+
+                                    <div className={styles.desc}>{m!.description}</div>
+                                </div>
+                            </Link>
+
+                            <div className={styles.side}>
+                                <div className={styles.ratingBox}>
+                                    <RatingControl
+                                        value={Math.round(Number(a.rating || 0) / 2)}
+                                        disabled={savingRatingId === Number(id)}
+                                        onChange={(next) => saveProfileRating(Number(id), next, a.status)}
+                                        onClear={() => clearProfileRating(Number(id), a.status)}
+                                    />
+                                </div>
+
+                                <button
+                                    className={styles.sideLink}
+                                    type="button"
+                                    onClick={() => removeItem(Number(id))}
+                                >
+                                    Убрать из списка
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
             {!loading && rows.length === 0 && (
-                <div className="small">пока нет активности: добавь статус или оценку любому произведению</div>
+                <div className="small">
+                    пока нет активности: добавь статус или оценку любому произведению
+                </div>
             )}
         </div>
     );

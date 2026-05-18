@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import type { MediaItem } from "../types/media";
-import type { ExternalSearchItem } from "../types/external";
+import {useEffect, useMemo, useState} from "react";
+import {useNavigate, useSearchParams} from "react-router-dom";
+import type {MediaItem} from "../types/media";
+import type {ExternalSearchItem} from "../types/external";
 import Cover from "../components/Cover";
-import { searchMedia } from "../api/media";
-import { externalSearch, externalImport } from "../api/external";
+import {searchMedia} from "../api/media";
+import {externalSearch, externalImport} from "../api/external";
 import styles from "./Search.module.css";
 
 type UnifiedResult =
@@ -191,28 +191,41 @@ export default function Search() {
                 setLocalItems([]);
                 setExternalItems([]);
                 setOnlineError(null);
+                setLoading(false);
                 return;
             }
 
             setLoading(true);
             setOnlineError(null);
 
-            try {
-                const [localRes, extRes] = await Promise.all([
-                    searchMedia({ q }),
-                    externalSearch({ q }),
-                ]);
+            const [localRes, extRes] = await Promise.allSettled([
+                searchMedia({q}),
+                externalSearch({q}),
+            ]);
 
-                if (cancelled) return;
+            if (cancelled) return;
 
-                setLocalItems(localRes.data ?? []);
-                setExternalItems(extRes.data.items ?? []);
-            } catch (e: any) {
-                if (cancelled) return;
-                setOnlineError(e?.response?.data?.error || e?.message || "Ошибка поиска");
-            } finally {
-                if (!cancelled) setLoading(false);
+            if (localRes.status === "fulfilled") {
+                setLocalItems(localRes.value.data ?? []);
+            } else {
+                setLocalItems([]);
             }
+
+            if (extRes.status === "fulfilled") {
+                setExternalItems(extRes.value.data.items ?? []);
+            } else {
+                setExternalItems([]);
+            }
+
+            if (localRes.status === "rejected" && extRes.status === "rejected") {
+                setOnlineError("Ошибка поиска");
+            } else if (localRes.status === "rejected") {
+                setOnlineError("Локальный поиск временно недоступен, показаны результаты из внешних источников");
+            } else if (extRes.status === "rejected") {
+                setOnlineError("Внешний поиск временно недоступен, показаны результаты из локального каталога");
+            }
+
+            setLoading(false);
         })();
 
         return () => {
@@ -272,7 +285,7 @@ export default function Search() {
             {onlineError && <div className="small">{onlineError}</div>}
 
             {!loading && q && results.length > 0 && (
-                <div className="small" style={{ margin: "10px 0" }}>
+                <div className="small" style={{margin: "10px 0"}}>
                     найдено результатов: {results.length}
                 </div>
             )}

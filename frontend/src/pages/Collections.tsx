@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {useEffect, useMemo, useState} from "react";
+import {useNavigate} from "react-router-dom";
 import {
     createCollection,
     getCollection,
@@ -8,17 +8,17 @@ import {
 } from "../api/collections";
 import styles from "./Collections.module.css";
 import RecommendationCard from "../components/RecommendationCard";
-import type { RecommendationItem } from "../types/recommendation";
+import type {RecommendationItem} from "../types/recommendation";
 
 type Collection = { id: number; title: string; description?: string };
 
 type PreviewMap = Record<number, { images: (string | null)[]; loading: boolean }>;
 
-function CoverTile({ src }: { src: string | null }) {
+function CoverTile({src}: { src: string | null }) {
     return src ? (
-        <img className={styles.coverImg} src={src} alt="" loading="lazy" />
+        <img className={styles.coverImg} src={src} alt="" loading="lazy"/>
     ) : (
-        <div className={styles.coverPh} />
+        <div className={styles.coverPh}/>
     );
 }
 
@@ -45,7 +45,7 @@ export default function Collections() {
 
             const init: PreviewMap = {};
             for (const c of cols) {
-                init[c.id] = { images: [null, null, null], loading: true };
+                init[c.id] = {images: [null, null, null], loading: true};
             }
             setPreview(init);
 
@@ -63,12 +63,12 @@ export default function Collections() {
 
                         setPreview((p) => ({
                             ...p,
-                            [c.id]: { images: imgs, loading: false },
+                            [c.id]: {images: imgs, loading: false},
                         }));
                     } catch {
                         setPreview((p) => ({
                             ...p,
-                            [c.id]: { images: [null, null, null], loading: false },
+                            [c.id]: {images: [null, null, null], loading: false},
                         }));
                     }
                 })
@@ -93,7 +93,7 @@ export default function Collections() {
         setError(null);
 
         try {
-            const res = await createCollection({ title: cleanTitle });
+            const res = await createCollection({title: cleanTitle});
             setTitle("");
 
             await load();
@@ -155,65 +155,72 @@ export default function Collections() {
             <div className={styles.list}>
                 {!loading &&
                     items.map((c) => {
-                        const pr = preview[c.id];
-                        const imgs = pr?.images || [null, null, null];
+                        const p = preview[c.id];
+                        const imgs = p?.images || [null, null, null];
+                        const recs = recsById[c.id];
 
                         return (
-                            <div key={c.id} className={styles.cardRow}>
-                                <button
-                                    type="button"
-                                    className={styles.mainArea}
-                                    onClick={() => navigate(`/collections/${c.id}`)}
-                                >
-                                    <div className={styles.covers}>
-                                        <div className={styles.stack} aria-label="covers">
-                                            <div className={styles.tile}>
-                                                <CoverTile src={imgs[0]} />
-                                            </div>
-                                            <div className={styles.tile}>
-                                                <CoverTile src={imgs[1]} />
-                                            </div>
-                                            <div className={styles.tile}>
-                                                <CoverTile src={imgs[2]} />
+                            <div key={c.id} className={styles.collectionBlock}>
+                                <div className={styles.cardRow}>
+                                    <button
+                                        className={styles.mainArea}
+                                        type="button"
+                                        onClick={() => navigate(`/collections/${c.id}`)}
+                                    >
+                                        <div className={styles.covers}>
+                                            <div className={styles.stack}>
+                                                {imgs.map((src, idx) => (
+                                                    <div key={idx} className={styles.tile}>
+                                                        <CoverTile src={src}/>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className={styles.info}>
-                                        <div className={styles.title}>{c.title}</div>
-                                        <div className={styles.desc}>
-                                            {c.description?.trim() || "Пока нет описания подборки"}
+                                        <div className={styles.info}>
+                                            <div className={styles.title}>{c.title}</div>
+                                            <div className={styles.desc}>
+                                                {c.description?.trim() || "Пока нет описания подборки"}
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <div className={styles.side}>
+                                        <div className={styles.actions}>
+                                            <button
+                                                className="btn"
+                                                type="button"
+                                                onClick={() => navigate(`/collections/${c.id}`)}
+                                            >
+                                                Открыть
+                                            </button>
+
+                                            <button
+                                                className="btn"
+                                                type="button"
+                                                onClick={() => loadRecs(c.id)}
+                                            >
+                                                Рекомендации
+                                            </button>
                                         </div>
                                     </div>
-                                </button>
-
-                                <div className={styles.side}>
-                                    <div className={styles.actions}>
-                                        <button
-                                            className="btn"
-                                            type="button"
-                                            onClick={() => navigate(`/collections/${c.id}`)}
-                                        >
-                                            Открыть
-                                        </button>
-
-                                        <button
-                                            className="btn"
-                                            type="button"
-                                            onClick={() => loadRecs(c.id)}
-                                        >
-                                            Рекомендации 💡
-                                        </button>
-                                    </div>
-
-                                    {recsById[c.id] && (
-                                        <div className={styles.recs}>
-                                            {recsById[c.id].map((r) => (
-                                                <RecommendationCard key={r.id} item={r} />
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
+
+                                {recs && (
+                                    <div className={styles.recsPanel}>
+                                        {recs.length === 0 ? (
+                                            <div className="small">
+                                                пока нет рекомендаций: добавь в подборку несколько произведений
+                                            </div>
+                                        ) : (
+                                            <div className={styles.recs}>
+                                                {recs.map((r) => (
+                                                    <RecommendationCard key={r.id} item={r}/>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}

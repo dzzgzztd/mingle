@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { getMediaById, getRecommendationsForMedia } from "../api/media";
-import { deleteActivity, getActivity, getProfile, upsertActivity } from "../api/profile";
-import { addToCollection, listCollections } from "../api/collections";
-import { adminDeleteMedia, adminUpdateMedia } from "../api/admin";
+import {useEffect, useMemo, useState} from "react";
+import {useNavigate, useParams} from "react-router-dom";
+import {getMediaById, getRecommendationsForMedia} from "../api/media";
+import {deleteActivity, getActivity, getProfile, upsertActivity} from "../api/profile";
+import {addToCollection, listCollections} from "../api/collections";
+import {adminDeleteMedia, adminUpdateMedia} from "../api/admin";
+import RatingControl from "../components/RatingControl";
 import Cover from "../components/Cover";
 import RecommendationCard from "../components/RecommendationCard";
-import type { MediaDraft, MediaItem } from "../types/media";
-import type { RecommendationItem } from "../types/recommendation";
+import type {MediaDraft, MediaItem} from "../types/media";
+import type {RecommendationItem} from "../types/recommendation";
 import styles from "./MediaDetail.module.css";
 
 type ActivityItem = {
@@ -33,23 +34,23 @@ function statusOptionsForType(type?: string, hasActivity?: boolean) {
     const base =
         type === "movie" || type === "series"
             ? [
-                { value: "viewed", label: "Посмотрел(а)" },
-                { value: "will_watch", label: "Буду смотреть" },
+                {value: "viewed", label: "Посмотрел(а)"},
+                {value: "will_watch", label: "Буду смотреть"},
             ]
             : type === "book"
                 ? [
-                    { value: "read", label: "Прочитал(а)" },
-                    { value: "will_read", label: "Буду читать" },
+                    {value: "read", label: "Прочитал(а)"},
+                    {value: "will_read", label: "Буду читать"},
                 ]
                 : type === "game"
                     ? [
-                        { value: "completed", label: "Прошел(а)" },
-                        { value: "will_play", label: "Хочу пройти" },
+                        {value: "completed", label: "Прошел(а)"},
+                        {value: "will_play", label: "Хочу пройти"},
                     ]
                     : [];
 
     if (hasActivity) {
-        return [...base, { value: REMOVE_STATUS, label: "Убрать из моего списка" }];
+        return [...base, {value: REMOVE_STATUS, label: "Убрать из моего списка"}];
     }
 
     return base;
@@ -81,7 +82,7 @@ function toDraft(item: MediaItem): MediaDraft {
 }
 
 export default function MediaDetail() {
-    const { id } = useParams();
+    const {id} = useParams();
     const navigate = useNavigate();
 
     const [item, setItem] = useState<MediaItem | null>(null);
@@ -306,7 +307,7 @@ export default function MediaDetail() {
     };
 
     const patchDraft = (patch: Partial<MediaDraft>) => {
-        setDraft((prev) => ({ ...((prev || {}) as MediaDraft), ...patch } as MediaDraft));
+        setDraft((prev) => ({...((prev || {}) as MediaDraft), ...patch} as MediaDraft));
     };
 
     const startEdit = () => {
@@ -362,7 +363,7 @@ export default function MediaDetail() {
 
         try {
             await adminDeleteMedia(id);
-            navigate("/media", { replace: true });
+            navigate("/media", {replace: true});
         } catch (e: any) {
             setActionMsg(e?.response?.data?.error || "Не удалось удалить контент");
         } finally {
@@ -378,7 +379,7 @@ export default function MediaDetail() {
         <div>
             <div className={styles.top}>
                 <div className={styles.cover}>
-                    <Cover src={item.imageURL ?? undefined} seed={String(item.id)} />
+                    <Cover src={item.imageURL ?? undefined} seed={String(item.id)}/>
                 </div>
 
                 <div className={styles.info}>
@@ -387,37 +388,20 @@ export default function MediaDetail() {
                             <div className={styles.title}>{item.title}</div>
                             <div className={styles.meta}>
                                 {item.year ?? "—"}
-                                <div className={styles.dot} />
+                                <div className={styles.dot}/>
                                 {item.creator || "Автор/режиссёр/разработчик"}
-                                <div className={styles.dot} />
+                                <div className={styles.dot}/>
                                 {TYPE_LABEL[item.type] ?? item.type}
                             </div>
                         </div>
 
                         <div className={styles.starBlock}>
-                            <div className={styles.starPick}>
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        className={i + 1 <= rating ? styles.on : styles.off}
-                                        onClick={() => saveRating(i + 1)}
-                                        aria-label={`rate ${i + 1}`}
-                                        disabled={busy}
-                                    >
-                                        ★
-                                    </button>
-                                ))}
-                            </div>
-
-                            <button
-                                className={styles.clearLink}
-                                type="button"
-                                onClick={clearRating}
+                            <RatingControl
+                                value={rating}
                                 disabled={busy}
-                            >
-                                Убрать оценку
-                            </button>
+                                onChange={saveRating}
+                                onClear={clearRating}
+                            />
                         </div>
                     </div>
 
@@ -487,7 +471,8 @@ export default function MediaDetail() {
                                     <button className="btn" type="button" onClick={startEdit} disabled={busy}>
                                         Редактировать контент
                                     </button>
-                                    <button className={styles.dangerBtn} type="button" onClick={removeMedia} disabled={busy}>
+                                    <button className={styles.dangerBtn} type="button" onClick={removeMedia}
+                                            disabled={busy}>
                                         Удалить контент
                                     </button>
                                 </div>
@@ -497,20 +482,20 @@ export default function MediaDetail() {
                                         <input
                                             className={styles.input}
                                             value={draft?.title || ""}
-                                            onChange={(e) => patchDraft({ title: e.target.value })}
+                                            onChange={(e) => patchDraft({title: e.target.value})}
                                             placeholder="Название"
                                         />
                                         <input
                                             className={styles.input}
                                             value={draft?.year ?? ""}
-                                            onChange={(e) => patchDraft({ year: e.target.value ? Number(e.target.value) : null })}
+                                            onChange={(e) => patchDraft({year: e.target.value ? Number(e.target.value) : null})}
                                             placeholder="Год"
                                             type="number"
                                         />
                                         <select
                                             className={styles.select}
                                             value={draft?.type || "movie"}
-                                            onChange={(e) => patchDraft({ type: e.target.value })}
+                                            onChange={(e) => patchDraft({type: e.target.value})}
                                         >
                                             {TYPES.map((t) => (
                                                 <option key={t} value={t}>{TYPE_LABEL[t]}</option>
@@ -521,21 +506,21 @@ export default function MediaDetail() {
                                     <input
                                         className={styles.input}
                                         value={draft?.creator || ""}
-                                        onChange={(e) => patchDraft({ creator: e.target.value })}
+                                        onChange={(e) => patchDraft({creator: e.target.value})}
                                         placeholder="Автор / режиссёр / разработчик"
                                     />
 
                                     <input
                                         className={styles.input}
                                         value={draft?.imageURL || ""}
-                                        onChange={(e) => patchDraft({ imageURL: e.target.value })}
+                                        onChange={(e) => patchDraft({imageURL: e.target.value})}
                                         placeholder="Ссылка на обложку"
                                     />
 
                                     <textarea
                                         className={styles.textarea}
                                         value={draft?.description || ""}
-                                        onChange={(e) => patchDraft({ description: e.target.value })}
+                                        onChange={(e) => patchDraft({description: e.target.value})}
                                         placeholder="Описание"
                                     />
 
@@ -554,13 +539,13 @@ export default function MediaDetail() {
                 </div>
             </div>
 
-            <div className="hr" />
+            <div className="hr"/>
 
             <div className={styles.sectionTitle}>Рекомендации Mingle</div>
 
             <div className={styles.strip}>
                 {mingleRecs.map((r) => (
-                    <RecommendationCard key={r.id} item={r} />
+                    <RecommendationCard key={r.id} item={r}/>
                 ))}
             </div>
 

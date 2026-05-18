@@ -1,6 +1,7 @@
 .wrap{
   display:block;
   width: 160px;
+  flex: 0 0 160px;
   color: inherit;
   text-decoration:none;
 }
@@ -19,17 +20,6 @@
   overflow:hidden;
   border:1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.045);
-}
-
-.cover :global(.img),
-.cover :global(.ph){
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
-  border:0;
-  object-fit: contain;
-  object-position: center;
-  background: rgba(255,255,255,.035);
 }
 
 .title{
