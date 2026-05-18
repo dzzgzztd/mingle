@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"mingle_backend/internal/models"
 
@@ -39,9 +40,10 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		userID := c.GetUint("user_id")
 
 		var input struct {
-			Name      string `json:"name"`
-			AvatarURL string `json:"avatar_url"`
+			Name      *string `json:"name"`
+			AvatarURL *string `json:"avatar_url"`
 		}
+
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -53,11 +55,15 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		if input.Name != "" {
-			user.Name = input.Name
+		if input.Name != nil {
+			name := strings.TrimSpace(*input.Name)
+			if name != "" {
+				user.Name = name
+			}
 		}
-		if input.AvatarURL != "" {
-			user.AvatarURL = input.AvatarURL
+
+		if input.AvatarURL != nil {
+			user.AvatarURL = strings.TrimSpace(*input.AvatarURL)
 		}
 
 		if err := db.Save(&user).Error; err != nil {
@@ -65,6 +71,17 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "updated"})
+		role := user.Role
+		if role == "" {
+			role = models.RoleUser
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":         user.ID,
+			"email":      user.Email,
+			"name":       user.Name,
+			"avatar_url": user.AvatarURL,
+			"role":       role,
+		})
 	}
 }

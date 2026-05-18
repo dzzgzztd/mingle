@@ -173,30 +173,59 @@ func AddToCollection(db *gorm.DB) gin.HandlerFunc {
 		var input struct {
 			MediaID uint `json:"media_id" binding:"required"`
 		}
+
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		var m models.MediaItem
-		if err := db.First(&m, input.MediaID).Error; err != nil {
+		var media models.MediaItem
+		if err := db.First(&media, input.MediaID).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "media not found"})
 			return
 		}
 
-		var existing models.CollectionItem
-		err := db.Where("collection_id = ? AND media_id = ?", col.ID, input.MediaID).First(&existing).Error
-		if err == nil {
-			c.JSON(http.StatusOK, gin.H{"message": "already in collection"})
-			return
-		}
-		if err != nil && err != gorm.ErrRecordNotFound {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing"})
-			return
-		}
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var existing models.CollectionItem
 
-		it := models.CollectionItem{CollectionID: col.ID, MediaID: input.MediaID}
-		if err := db.Create(&it).Error; err != nil {
+			err := tx.Unscoped().
+				Where("collection_id = ? AND media_id = ?", col.ID, input.MediaID).
+				First(&existing).Error
+
+			if err == nil {
+				if existing.DeletedAt.Valid {
+					if err := tx.Unscoped().
+						Model(&existing).
+						Updates(map[string]any{
+							"deleted_at": nil,
+							"updated_at": time.Now(),
+						}).Error; err != nil {
+						return err
+					}
+
+					return tx.Model(&col).Update("updated_at", time.Now()).Error
+				}
+
+				return nil
+			}
+
+			if err != gorm.ErrRecordNotFound {
+				return err
+			}
+
+			item := models.CollectionItem{
+				CollectionID: col.ID,
+				MediaID:      input.MediaID,
+			}
+
+			if err := tx.Create(&item).Error; err != nil {
+				return err
+			}
+
+			return tx.Model(&col).Update("updated_at", time.Now()).Error
+		})
+
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add"})
 			return
 		}
@@ -217,12 +246,32 @@ func RemoveFromCollection(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		res := db.Where("collection_id = ? AND media_id = ?", col.ID, mediaID).Delete(&models.CollectionItem{})
-		if res.Error != nil {
+		var removed int64
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			res := tx.Unscoped().
+				Where("collection_id = ? AND media_id = ?", col.ID, mediaID).
+				Delete(&models.CollectionItem{})
+
+			if res.Error != nil {
+				return res.Error
+			}
+
+			removed = res.RowsAffected
+
+			if removed > 0 {
+				return tx.Model(&col).Update("updated_at", time.Now()).Error
+			}
+
+			return nil
+		})
+
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove"})
 			return
 		}
-		if res.RowsAffected == 0 {
+
+		if removed == 0 {
 			c.JSON(http.StatusNotFound, gin.H{"error": "item not found in collection"})
 			return
 		}

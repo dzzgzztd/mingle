@@ -30,17 +30,11 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		role := models.RoleUser
-		var usersCount int64
-		if err := db.Model(&models.User{}).Count(&usersCount).Error; err == nil && usersCount == 0 {
-			role = models.RoleAdmin
-		}
-
 		user := models.User{
 			Email:    req.Email,
 			Password: hash,
 			Name:     req.Name,
-			Role:     role,
+			Role:     models.RoleUser,
 		}
 
 		if err := db.Create(&user).Error; err != nil {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"mingle_backend/internal/cache"
 	"mingle_backend/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -162,7 +163,7 @@ func ListMediaSubmissions(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func ApproveMediaSubmission(db *gorm.DB) gin.HandlerFunc {
+func ApproveMediaSubmission(db *gorm.DB, cch *cache.RedisCache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		adminID := c.GetUint("user_id")
 		id := c.Param("id")
@@ -204,6 +205,10 @@ func ApproveMediaSubmission(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if cch != nil {
+			_ = cch.DeleteByPrefix(c.Request.Context(), cache.SearchCachePrefix())
+		}
+
 		c.JSON(http.StatusOK, gin.H{"submission": toSubmissionDTO(submission), "item": item})
 	}
 }
@@ -242,7 +247,7 @@ func RejectMediaSubmission(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func AdminUpdateMedia(db *gorm.DB) gin.HandlerFunc {
+func AdminUpdateMedia(db *gorm.DB, cch *cache.RedisCache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
@@ -276,24 +281,127 @@ func AdminUpdateMedia(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if cch != nil {
+			_ = cch.DeleteByPrefix(c.Request.Context(), cache.SearchCachePrefix())
+		}
+
 		c.JSON(http.StatusOK, media)
 	}
 }
 
-func AdminDeleteMedia(db *gorm.DB) gin.HandlerFunc {
+func AdminDeleteMedia(db *gorm.DB, cch *cache.RedisCache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
-		res := db.Delete(&models.MediaItem{}, id)
-		if res.Error != nil {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var media models.MediaItem
+			if err := tx.First(&media, id).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Where("media_id = ?", media.ID).Delete(&models.UserMedia{}).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Where("media_id = ?", media.ID).Delete(&models.CollectionItem{}).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Model(&models.MediaSubmission{}).
+				Where("media_id = ?", media.ID).
+				Update("media_id", nil).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Delete(&media).Error; err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{"error": "media not found"})
+				return
+			}
+
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete media"})
 			return
 		}
-		if res.RowsAffected == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "media not found"})
-			return
+
+		if cch != nil {
+			_ = cch.DeleteByPrefix(c.Request.Context(), cache.SearchCachePrefix())
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "media deleted"})
+	}
+}
+
+func UpdateMediaSubmission(db *gorm.DB, cch *cache.RedisCache) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var submission models.MediaSubmission
+		if err := db.First(&submission, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "submission not found"})
+			return
+		}
+
+		var input mediaPayload
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		input, validationErr := normalizeMediaPayload(input)
+		if validationErr != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": validationErr})
+			return
+		}
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			submission.Title = input.Title
+			submission.Description = input.Description
+			submission.Type = input.Type
+			submission.Year = input.Year
+			submission.Creator = input.Creator
+			submission.ImageURL = input.ImageURL
+
+			if err := tx.Save(&submission).Error; err != nil {
+				return err
+			}
+
+			if submission.Status == models.MediaSubmissionApproved && submission.MediaID != nil {
+				var media models.MediaItem
+				if err := tx.First(&media, *submission.MediaID).Error; err != nil {
+					return err
+				}
+
+				media.Title = input.Title
+				media.Description = input.Description
+				media.Type = input.Type
+				media.Year = input.Year
+				media.Creator = input.Creator
+				media.ImageURL = input.ImageURL
+
+				if err := tx.Save(&media).Error; err != nil {
+					return err
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update submission"})
+			return
+		}
+
+		if cch != nil {
+			_ = cch.DeleteByPrefix(c.Request.Context(), cache.SearchCachePrefix())
+		}
+
+		c.JSON(http.StatusOK, toSubmissionDTO(submission))
 	}
 }

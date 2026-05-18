@@ -1,11 +1,18 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+	"strings"
+)
 
 func JWTSecret() string {
-	secret := os.Getenv("JWT_SECRET")
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
-		secret = "super-secret-key"
+		log.Fatal("JWT_SECRET environment variable is required")
+	}
+	if len(secret) < 32 {
+		log.Fatal("JWT_SECRET must be at least 32 characters")
 	}
 	return secret
 }

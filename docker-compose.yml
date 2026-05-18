@@ -4,16 +4,16 @@ services:
     container_name: mingle_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: mingle
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mingle"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 3s
       timeout: 3s
       retries: 30
@@ -25,19 +25,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
+      recommendation:
+        condition: service_started
     environment:
+      PORT: ${BACKEND_PORT}
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: mingle
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      REDIS_ADDR: "redis:6379"
-      JWT_SECRET: supersecretkey
-      OMDB_API_KEY: "98364f71"
-      GOOGLE_BOOKS_API_KEY: "AIzaSyCts9JB2avj-vvzYypda0xKT4uQu9FRAAA"
-      TGDB_API_KEY: "ea83d239de58a0b818a344e6d88410797deb28f290c69b7c438e9b19489132eb"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_SSLMODE: ${DB_SSLMODE}
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      RECOMMENDATION_URL: ${RECOMMENDATION_URL}
+      OMDB_API_KEY: ${OMDB_API_KEY}
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY}
+      TGDB_API_KEY: ${TGDB_API_KEY}
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT}:8080"
     volumes:
       - ./backend/seed:/app/seed
 
@@ -46,7 +53,7 @@ services:
     container_name: mingle_recommendation
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${RECOMMENDATION_PORT}:8000"
 
   frontend:
     build: ./frontend
@@ -55,12 +62,14 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT}:5173"
 
   redis:
     image: redis:7-alpine
+    container_name: mingle_redis
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
 
 volumes:
   postgres_data:

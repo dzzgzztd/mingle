@@ -36,12 +36,12 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	searchHandler := handlers.NewSearchHandler(db, c)
 	api.GET("/search", searchHandler.SearchMedia())
 
-	api.GET("/external/search", handlers.ExternalSearch(db))
-	api.POST("/external/import", handlers.ExternalImport(db))
+	api.GET("/external/search", handlers.ExternalSearch(db, c))
 
 	protected := api.Group("/")
 	protected.Use(middleware.AuthRequired())
 
+	protected.POST("/external/import", handlers.ExternalImport(db, c))
 	protected.GET("/profile", handlers.GetProfile(db))
 	protected.PATCH("/profile", handlers.UpdateProfile(db))
 
@@ -68,8 +68,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	admin := protected.Group("/admin")
 	admin.Use(middleware.AdminRequired(db))
 	admin.GET("/submissions/media", handlers.ListMediaSubmissions(db))
-	admin.POST("/submissions/media/:id/approve", handlers.ApproveMediaSubmission(db))
+	admin.PATCH("/submissions/media/:id", handlers.UpdateMediaSubmission(db, c))
+	admin.POST("/submissions/media/:id/approve", handlers.ApproveMediaSubmission(db, c))
 	admin.POST("/submissions/media/:id/reject", handlers.RejectMediaSubmission(db))
-	admin.PATCH("/media/:id", handlers.AdminUpdateMedia(db))
-	admin.DELETE("/media/:id", handlers.AdminDeleteMedia(db))
+	admin.PATCH("/media/:id", handlers.AdminUpdateMedia(db, c))
+	admin.DELETE("/media/:id", handlers.AdminDeleteMedia(db, c))
 }

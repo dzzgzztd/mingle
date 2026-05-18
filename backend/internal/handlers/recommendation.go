@@ -49,12 +49,56 @@ func recommendationDTOFromMedia(media models.MediaItem, score float64) Recommend
 	}
 }
 
+func idsFromSet(set map[uint]bool) []uint {
+	out := make([]uint, 0, len(set))
+	for id := range set {
+		out = append(out, id)
+	}
+	return out
+}
+
+func loadCatalogItems(db *gorm.DB) ([]services.CatalogItem, error) {
+	var catalogMedia []models.MediaItem
+	if err := db.Find(&catalogMedia).Error; err != nil {
+		return nil, err
+	}
+
+	catalog := make([]services.CatalogItem, 0, len(catalogMedia))
+	for _, m := range catalogMedia {
+		catalog = append(catalog, mediaToCatalogItem(m))
+	}
+
+	return catalog, nil
+}
+
+func loadUserActivity(db *gorm.DB, userID uint) ([]models.UserMedia, error) {
+	var activity []models.UserMedia
+	if err := db.Where("user_id = ?", userID).Find(&activity).Error; err != nil {
+		return nil, err
+	}
+	return activity, nil
+}
+
+func recommendationsToDTO(db *gorm.DB, resp services.RecommendationResponse) []RecommendationDTO {
+	result := make([]RecommendationDTO, 0, len(resp.Recommendations))
+
+	for _, rec := range resp.Recommendations {
+		var media models.MediaItem
+		if err := db.First(&media, rec.MediaID).Error; err != nil {
+			continue
+		}
+		result = append(result, recommendationDTOFromMedia(media, rec.Score))
+	}
+
+	return result
+}
+
 func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetUint("user_id")
 
-		var activity []models.UserMedia
-		if err := db.Where("user_id = ? AND rating IS NOT NULL", userID).Find(&activity).Error; err != nil {
+		activity, err := loadUserActivity(db, userID)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user activity"})
 			return
 		}
@@ -64,21 +108,27 @@ func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		history := []services.HistoryItem{}
-		exclude := []uint{}
+		history := make([]services.HistoryItem, 0, len(activity))
+		excludeSet := make(map[uint]bool)
+
 		for _, a := range activity {
+			excludeSet[a.MediaID] = true
+
 			var media models.MediaItem
 			if err := db.First(&media, a.MediaID).Error; err == nil {
 				history = append(history, mediaToHistoryItem(media, a.Rating))
-				exclude = append(exclude, media.ID)
 			}
 		}
 
-		var catalogMedia []models.MediaItem
-		db.Find(&catalogMedia)
-		catalog := []services.CatalogItem{}
-		for _, m := range catalogMedia {
-			catalog = append(catalog, mediaToCatalogItem(m))
+		if len(history) == 0 {
+			c.JSON(http.StatusOK, gin.H{"recommendations": []any{}})
+			return
+		}
+
+		catalog, err := loadCatalogItems(db)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load catalog"})
+			return
 		}
 
 		resp, err := services.GetRecommendations(services.RecommendationRequest{
@@ -86,23 +136,14 @@ func GetRecommendations(db *gorm.DB) gin.HandlerFunc {
 			UserHistory: history,
 			Catalog:     catalog,
 			Limit:       10,
-			ExcludeIDs:  exclude,
+			ExcludeIDs:  idsFromSet(excludeSet),
 		})
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "recommendation service unavailable"})
 			return
 		}
 
-		result := []RecommendationDTO{}
-		for _, rec := range resp.Recommendations {
-			var media models.MediaItem
-			if err := db.First(&media, rec.MediaID).Error; err != nil {
-				continue
-			}
-			result = append(result, recommendationDTOFromMedia(media, rec.Score))
-		}
-
-		c.JSON(http.StatusOK, gin.H{"recommendations": result})
+		c.JSON(http.StatusOK, gin.H{"recommendations": recommendationsToDTO(db, resp)})
 	}
 }
 
@@ -117,36 +158,38 @@ func GetRecommendationsForMedia(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		history := []services.HistoryItem{mediaToHistoryItem(target, nil)}
-		exclude := []uint{target.ID}
+		excludeSet := map[uint]bool{
+			target.ID: true,
+		}
 
-		var catalogMedia []models.MediaItem
-		db.Find(&catalogMedia)
-		catalog := []services.CatalogItem{}
-		for _, m := range catalogMedia {
-			catalog = append(catalog, mediaToCatalogItem(m))
+		activity, err := loadUserActivity(db, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user activity"})
+			return
+		}
+
+		for _, a := range activity {
+			excludeSet[a.MediaID] = true
+		}
+
+		catalog, err := loadCatalogItems(db)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load catalog"})
+			return
 		}
 
 		resp, err := services.GetRecommendations(services.RecommendationRequest{
 			UserID:      userID,
-			UserHistory: history,
+			UserHistory: []services.HistoryItem{mediaToHistoryItem(target, nil)},
 			Catalog:     catalog,
 			Limit:       10,
-			ExcludeIDs:  exclude,
+			ExcludeIDs:  idsFromSet(excludeSet),
 		})
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "recommendation service unavailable"})
 			return
 		}
 
-		result := []RecommendationDTO{}
-		for _, rec := range resp.Recommendations {
-			var media models.MediaItem
-			if err := db.First(&media, rec.MediaID).Error; err != nil {
-				continue
-			}
-			result = append(result, recommendationDTOFromMedia(media, rec.Score))
-		}
-		c.JSON(http.StatusOK, gin.H{"recommendations": result})
+		c.JSON(http.StatusOK, gin.H{"recommendations": recommendationsToDTO(db, resp)})
 	}
 }

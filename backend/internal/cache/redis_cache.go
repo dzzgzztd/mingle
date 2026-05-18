@@ -75,3 +75,35 @@ func ExternalSearchCacheKey(provider, q string) string {
 func ExternalDetailsCacheKey(provider, externalID string) string {
 	return "external_details:v1:" + provider + ":" + hashKey(externalID)
 }
+
+func (c *RedisCache) DeleteByPrefix(ctx context.Context, prefix string) error {
+	if c == nil || c.rdb == nil {
+		return nil
+	}
+
+	var cursor uint64
+
+	for {
+		keys, nextCursor, err := c.rdb.Scan(ctx, cursor, prefix+"*", 100).Result()
+		if err != nil {
+			return err
+		}
+
+		if len(keys) > 0 {
+			if err := c.rdb.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return nil
+}
+
+func SearchCachePrefix() string {
+	return "search:v1:"
+}

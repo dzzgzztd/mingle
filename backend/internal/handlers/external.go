@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
+	"mingle_backend/internal/cache"
 	"mingle_backend/internal/integrations"
 	"mingle_backend/internal/models"
 
@@ -76,7 +79,64 @@ func searchScore(query, title, creator string, year *int, hasImage bool) int {
 	return score
 }
 
-func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
+func cachedExternalSearch(
+	ctx context.Context,
+	c *cache.RedisCache,
+	provider string,
+	q string,
+	page int,
+	call func(context.Context, string, int) ([]integrations.ExternalSearchItem, error),
+) ([]integrations.ExternalSearchItem, error) {
+	key := cache.ExternalSearchCacheKey(provider, normalizeSearchText(q))
+
+	if c != nil {
+		var cached []integrations.ExternalSearchItem
+		if ok, err := c.GetJSON(ctx, key, &cached); err == nil && ok {
+			return cached, nil
+		}
+	}
+
+	res, err := call(ctx, q, page)
+	if err != nil {
+		return nil, err
+	}
+
+	if c != nil {
+		_ = c.SetJSON(ctx, key, res, 6*time.Hour)
+	}
+
+	return res, nil
+}
+
+func cachedExternalDetails(
+	ctx context.Context,
+	c *cache.RedisCache,
+	provider string,
+	externalID string,
+	call func(context.Context, string) (integrations.ExternalDetails, error),
+) (integrations.ExternalDetails, error) {
+	key := cache.ExternalDetailsCacheKey(provider, externalID)
+
+	if c != nil {
+		var cached integrations.ExternalDetails
+		if ok, err := c.GetJSON(ctx, key, &cached); err == nil && ok {
+			return cached, nil
+		}
+	}
+
+	res, err := call(ctx, externalID)
+	if err != nil {
+		return integrations.ExternalDetails{}, err
+	}
+
+	if c != nil {
+		_ = c.SetJSON(ctx, key, res, 12*time.Hour)
+	}
+
+	return res, nil
+}
+
+func ExternalSearch(db *gorm.DB, cch *cache.RedisCache) gin.HandlerFunc {
 	omdb := integrations.NewOMDb()
 	gbooks := integrations.NewGBooks()
 	tgdb := integrations.NewTGDB()
@@ -95,7 +155,7 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 
 		switch src {
 		case "omdb":
-			res, err := omdb.Search(c.Request.Context(), q, page)
+			res, err := cachedExternalSearch(c.Request.Context(), cch, "omdb", q, page, omdb.Search)
 			if err != nil {
 				log.Println("[external-search][omdb] error:", err)
 				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -104,7 +164,7 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			items = append(items, res...)
 
 		case "gbooks":
-			res, err := gbooks.Search(c.Request.Context(), q, page)
+			res, err := cachedExternalSearch(c.Request.Context(), cch, "gbooks", q, page, gbooks.Search)
 			if err != nil {
 				log.Println("[external-search][gbooks] error:", err)
 				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -113,7 +173,7 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			items = append(items, res...)
 
 		case "tgdb":
-			res, err := tgdb.Search(c.Request.Context(), q, page)
+			res, err := cachedExternalSearch(c.Request.Context(), cch, "tgdb", q, page, tgdb.Search)
 			if err != nil {
 				log.Println("[external-search][tgdb] error:", err)
 				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -122,19 +182,19 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 			items = append(items, res...)
 
 		default:
-			if res, err := omdb.Search(c.Request.Context(), q, page); err == nil {
+			if res, err := cachedExternalSearch(c.Request.Context(), cch, "omdb", q, page, omdb.Search); err == nil {
 				items = append(items, res...)
 			} else {
 				log.Println("[external-search][omdb] error:", err)
 			}
 
-			if res, err := gbooks.Search(c.Request.Context(), q, page); err == nil {
+			if res, err := cachedExternalSearch(c.Request.Context(), cch, "gbooks", q, page, gbooks.Search); err == nil {
 				items = append(items, res...)
 			} else {
 				log.Println("[external-search][gbooks] error:", err)
 			}
 
-			if res, err := tgdb.Search(c.Request.Context(), q, page); err == nil {
+			if res, err := cachedExternalSearch(c.Request.Context(), cch, "tgdb", q, page, tgdb.Search); err == nil {
 				items = append(items, res...)
 			} else {
 				log.Println("[external-search][tgdb] error:", err)
@@ -154,7 +214,7 @@ func ExternalSearch(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func ExternalImport(db *gorm.DB) gin.HandlerFunc {
+func ExternalImport(db *gorm.DB, cch *cache.RedisCache) gin.HandlerFunc {
 	omdb := integrations.NewOMDb()
 	gbooks := integrations.NewGBooks()
 	tgdb := integrations.NewTGDB()
@@ -174,11 +234,11 @@ func ExternalImport(db *gorm.DB) gin.HandlerFunc {
 
 		switch req.Source {
 		case "omdb":
-			details, err = omdb.GetByID(c.Request.Context(), req.ExternalID)
+			details, err = cachedExternalDetails(c.Request.Context(), cch, "omdb", req.ExternalID, omdb.GetByID)
 		case "gbooks":
-			details, err = gbooks.GetByID(c.Request.Context(), req.ExternalID)
+			details, err = cachedExternalDetails(c.Request.Context(), cch, "gbooks", req.ExternalID, gbooks.GetByID)
 		case "tgdb":
-			details, err = tgdb.GetByID(c.Request.Context(), req.ExternalID)
+			details, err = cachedExternalDetails(c.Request.Context(), cch, "tgdb", req.ExternalID, tgdb.GetByID)
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown source"})
 			return
@@ -214,6 +274,10 @@ func ExternalImport(db *gorm.DB) gin.HandlerFunc {
 				return
 			}
 
+			if cch != nil {
+				_ = cch.DeleteByPrefix(c.Request.Context(), cache.SearchCachePrefix())
+			}
+
 			c.JSON(http.StatusOK, gin.H{"mediaId": existing.ID, "item": existing})
 			return
 		}
@@ -231,10 +295,21 @@ func ExternalImport(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := db.Create(&item).Error; err != nil {
+			var existing models.MediaItem
+			if findErr := db.Where("source = ? AND external_id = ?", req.Source, req.ExternalID).
+				First(&existing).Error; findErr == nil {
+				c.JSON(http.StatusOK, gin.H{"mediaId": existing.ID, "item": existing})
+				return
+			}
+
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save media"})
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"mediaId": item.ID, "item": item})
+		if cch != nil {
+			_ = cch.DeleteByPrefix(c.Request.Context(), cache.SearchCachePrefix())
+
+			c.JSON(http.StatusCreated, gin.H{"mediaId": item.ID, "item": item})
+		}
 	}
 }
